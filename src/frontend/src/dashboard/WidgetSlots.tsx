@@ -6,7 +6,7 @@ interface WidgetSlot {
 }
 
 interface WidgetSlotsProps {
-  widgets: WidgetSlot[]
+  widgets: (WidgetSlot | null)[]
 }
 
 export default function WidgetSlots({ widgets }: WidgetSlotsProps) {
@@ -15,32 +15,13 @@ export default function WidgetSlots({ widgets }: WidgetSlotsProps) {
   if (!hero) return null
 
   return (
-    <div className="flex-1 flex flex-col px-4 pb-4 gap-3 min-h-0">
-      
-      <div className="flex-1 min-h-0 rounded-2xl bg-card overflow-hidden">
-        {hero.component}
+    <div className="flex flex-col p-4 gap-2 h-full">
+      <div className="h-1/2">
+        {hero && hero.component}
       </div>
-
-      {wide && (
-        <div className="basis-[15%] shrink-0 min-h-0 rounded-2xl bg-card overflow-hidden">
-          {wide.component}
-        </div>
-      )}
-
-      {/* Smalls: 15% height */}
-      {smallA && (
-        <div className="basis-[25%] shrink-0 min-h-0 flex flex-row gap-3">
-          <div className="flex-1 min-h-0 rounded-2xl bg-card overflow-hidden">
-            {smallA.component}
-          </div>
-          {smallB && (
-            <div className="flex-1 min-h-0 rounded-2xl bg-card overflow-hidden">
-              {smallB.component}
-            </div>
-          )}
-        </div>
-      )}
-
+      {wide && wide.component}
+      {smallA && smallA.component}
+      {smallB && smallB.component}
     </div>
   )
 }

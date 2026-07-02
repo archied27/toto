@@ -21,6 +21,5 @@ class DashboardState:
             "hero": {"id": self.hero.id, "priority": self.hero.priority},
             "long": {"id": self.long.id, "priority": self.long.priority},
             "small_a": {"id": self.small_a.id, "priority": self.small_a.priority},
-            "small_b": {"id": self.small_b.id, "priority": self.small_b.priority},
-            
+            "small_b": {"id": self.small_b.id, "priority": self.small_b.priority},   
         }

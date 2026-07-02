@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { useAddTask, useGetTaskLabels, useGetTaskLists } from "../useTasks";
+import { useEditTask, useGetTaskLabels, useGetTaskLists, type Task } from "../useTasks";
 import { CheckIcon, ScrollTextIcon, TagIcon, XIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -10,21 +10,21 @@ import LabelListButton from "./LabelListButton";
 import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 
-export default function AddTask({ onClose }: { onClose?: () => void }) {
+export default function EditTask({ onClose, task }: { onClose?: () => void; task: Task }) {
     const lists = useGetTaskLists();
     const labels = useGetTaskLabels();
-    const { addTask, loading } = useAddTask();
+    const { editTask, loading } = useEditTask();
 
-    const [name, setName] = useState<string>("");
-    const [description, setDescription] = useState<string | null>(null);
-    const [dueDate, setDueDate] = useState<string | null>(null);
-    const [toDoDate, setToDoDate] = useState<string | null>(null);
-    const [selectedList, setSelectedList] = useState<number | null>(null);
-    const [selectedLabels, setSelectedLabels] = useState<number[]>([]);
+    const [name, setName] = useState<string>(task.title);
+    const [description, setDescription] = useState<string | null>(task.description || null);
+    const [dueDate, setDueDate] = useState<string | null>(task.due_date || null);
+    const [toDoDate, setToDoDate] = useState<string | null>(task.to_do_date || null);
+    const [selectedList, setSelectedList] = useState<number | null>(task.task_list?.id || null);
+    const [selectedLabels, setSelectedLabels] = useState<number[]>(task?.labels?.map((label) => label.id) || []);
 
     const onSubmit = async () => {
         if (!name.trim()) return;
-        await addTask(name, description, dueDate, toDoDate, selectedList, selectedLabels);
+        await editTask(task.id, name, description, dueDate, toDoDate, selectedList, selectedLabels);
         onClose?.();
     }
 
@@ -32,13 +32,13 @@ export default function AddTask({ onClose }: { onClose?: () => void }) {
         <Card className="w-full max-w-md overflow-hidden border border-border/50">
             <div className="flex items-center justify-between px-5">
                 <XIcon className="h-5 w-5" onClick={onClose} />
-                <h2 className="text-base font-semibold text-foreground">Add Task</h2>
+                <h2 className="text-base font-semibold text-foreground">Edit Task</h2>
                 <CheckIcon className={`h-5 w-5 ${!name.trim() || loading ? 'text-muted-foreground' : 'text-primary'}`} onClick={onSubmit} />
             </div>
             
             <div className="px-3 flex flex-col gap-3 w-full">
                 <Input placeholder="What needs doing?" value={name} onChange={(e) => setName(e.target.value)} />
-                <Textarea placeholder="Description" value={description || ''} className="h-[100px]" onChange={(e) => setDescription(e.target.value)} />
+                <Textarea placeholder="Description" value={description || ''}  className="h-[100px]" onChange={(e) => setDescription(e.target.value)} />
                 <DatePicker placeholder="Do it when?" value={toDoDate} onChange={setToDoDate} />
                 <DatePicker placeholder="When is it due?" value={dueDate} onChange={setDueDate} />
 

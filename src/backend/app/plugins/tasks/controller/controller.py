@@ -43,6 +43,7 @@ class TasksController:
             await self.core.state.set("tasks", new_state)
             self.core.bus.emit_no_wait("tasks.state_updated", new_state.model_dump(mode="json"))
             self.core.bus.emit_no_wait("dashboard.rerank")
+            self.core.bus.emit_no_wait("pages.rerank")
 
     async def get_state(self) -> TasksState:
         # get the state of the tasks plugin

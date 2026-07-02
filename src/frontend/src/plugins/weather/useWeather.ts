@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
-import { useWebSocketContext } from "@/hooks/WebSocketContext";
+import { useState, useEffect } from "react";
 import { apiFetch } from "@/hooks/api";
+import { useWebSocketEvent } from "@/hooks/useWebSocketEvent";
 
 
 export interface WeatherAtTime {
@@ -35,7 +35,6 @@ export function useWeather() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
-  const { useEvent } = useWebSocketContext();
 
   useEffect(() => {
     apiFetch<WeatherData>("/weather/current")
@@ -49,12 +48,10 @@ export function useWeather() {
         })
   }, []);
 
-  const handleUpdate = useCallback((data: unknown) => {
-    setWeather(data as WeatherData);
+  useWebSocketEvent<WeatherData>("weather.updated", (newWeather) => {
+    setWeather(newWeather);
     setRefreshing(false);
-  }, []);
-
-  useEvent("weather.updated", handleUpdate);
+  });
 
   return { weather, loading, error, refreshing, setRefreshing };
 }

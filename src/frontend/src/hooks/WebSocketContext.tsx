@@ -1,59 +1,76 @@
+import { createContext, useContext,  useRef } from "react";
 import { useWebSocket, type ConnectionStatus } from "@/hooks/useWebSocket";
-import { createContext, useContext, useEffect, useRef } from "react";
 
 export interface WSMessage {
     type: string;
-    data: unknown;
+    data: any;
 }
 
 export interface WSContextValue {
     connectionStatus: ConnectionStatus;
-    useEvent: (eventType: string, handler: (data:unknown) => void) => void;
     send: (message: unknown) => void;
+    // Expose standard functions, NOT hooks
+    subscribe: (eventType: string, callback: (data: any) => void) => void;
+    unsubscribe: (eventType: string, callback: (data: any) => void) => void;
 }
 
 const WebSocketContext = createContext<WSContextValue | null>(null);
 
-export function WebSocketProvider({ url, children }: { url:string, children: React.ReactNode })
-{
-    const { connectionStatus, lastMessage, send } = useWebSocket(url);
-    // registry of handlers
-    // e.g { "dashboard.rerank": [function, function] }
-    const handlersRef = useRef<Map<string, Set<(data: unknown) => void>>>(new Map());
+export function WebSocketProvider({ url, children }: { url: string; children: React.ReactNode }) {
+    const handlersRef = useRef<Map<string, Set<(data: any) => void>>>(new Map());
 
-    useEffect(() => {
-        if(!lastMessage) return;
+    // Process packets straight out of the network wire, avoiding React state batching completely
+    const handleIncomingPacket = (msg: WSMessage) => {
+        if (!msg || !msg.type) return;
 
-        const msg = lastMessage as WSMessage;
         const handlers = handlersRef.current.get(msg.type);
 
-        if (handlers) {
-            handlers.forEach(fn => fn(msg.data));
+        if (handlers && handlers.size > 0) {
+            console.log(`[WS-Stream] Dispatching type ${msg.type} to ${handlers.size} handlers`);
+            handlers.forEach((callback) => {
+                try {
+                    callback(msg.data);
+                } catch (err) {
+                    console.error(`Error in WebSocket handler for ${msg.type}:`, err);
+                }
+            });
+        } else {
+            console.warn(`[WS-Stream] No handlers registered for message type: ${msg.type}`);
         }
-    }, [lastMessage])
+    };
 
-    const useEvent = (eventType: string, handler: (data: unknown) => void) => {
-        useEffect(() => {
-            if(!handlersRef.current.has(eventType)) {
-                handlersRef.current.set(eventType, new Set());
+    // Instantiate hook with our instantaneous callback
+    const { connectionStatus, send } = useWebSocket(url, {
+        onMessage: handleIncomingPacket
+    });
+
+    const subscribe = (eventType: string, callback: (data: any) => void) => {
+        if (!handlersRef.current.has(eventType)) {
+            handlersRef.current.set(eventType, new Set());
+        }
+        handlersRef.current.get(eventType)!.add(callback);
+    };
+
+    const unsubscribe = (eventType: string, callback: (data: any) => void) => {
+        const handlers = handlersRef.current.get(eventType);
+        if (handlers) {
+            handlers.delete(callback);
+            if (handlers.size === 0) {
+                handlersRef.current.delete(eventType);
             }
-            handlersRef.current.get(eventType)!.add(handler);
-
-            return () => {
-                handlersRef.current.get(eventType)!.delete(handler);
-            };
-        }, [eventType, handler]);
+        }
     };
 
     return (
-        <WebSocketContext.Provider value={{ connectionStatus, useEvent, send }}>
-            { children }
+        <WebSocketContext.Provider value={{ connectionStatus, send, subscribe, unsubscribe }}>
+            {children}
         </WebSocketContext.Provider>
     );
 }
 
+// Hook to access the context raw elements
 export function useWebSocketContext() {
     const context = useContext(WebSocketContext);
-    if (!context) throw new Error("useWebSocketContext hook used outside WebSocketProvider");
+    if (!context) throw new Error("useWebSocketContext must be used within a WebSocketProvider");
     return context;
 }

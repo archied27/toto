@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 export type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 
 export interface UseWebSocketOptions {
-    onMessage?: (data: unknown) => (null);
+    onMessage?: (data: any) => (void);
     maxRetries?: number;
     baseDelay?: number;
     maxDelay?: number;
@@ -54,6 +54,7 @@ export function useWebSocket(
         wsRef.current = ws;
 
         ws.onopen = () => {
+            console.log("[WS] Connected");
             setConnectionStatus("connected");
             retryCountRef.current = 0;
         };
@@ -61,8 +62,10 @@ export function useWebSocket(
         ws.onmessage = (event: MessageEvent) => {
             let parsed: unknown;
             try {
+                console.log("[WS] Received message:", event.data);
                 parsed = JSON.parse(event.data as string);
             } catch {
+                console.warn("[WS] Received non-JSON message:", event.data);
                 parsed = event.data;
             }
 
@@ -71,6 +74,7 @@ export function useWebSocket(
         }
 
         ws.onclose = () => {
+            console.warn("[WS] Connection closed");
             setConnectionStatus("disconnected");
 
             if(!shouldReconnectRef.current) return;

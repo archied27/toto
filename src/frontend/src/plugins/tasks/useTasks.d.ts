@@ -25,6 +25,7 @@ export interface TaskState {
 }
 export declare function useTaskState(): {
     taskState: TaskState | null;
+    getTasks: () => void;
 };
 export declare function useGetTaskLists(): {
     taskLists: TaskList[];
@@ -73,4 +74,16 @@ export declare function useGetTomorrowTasks(): {
 export declare function useGetUpcomingTasks(): {
     tasks: Task[];
     refetch: () => void;
+};
+export declare function useToggleTaskCompletion(): {
+    toggleCompletion: (taskId: number) => Promise<void>;
+    loading: boolean;
+};
+export declare function useDeleteTask(): {
+    deleteTask: (taskId: number) => Promise<void>;
+    loading: boolean;
+};
+export declare function useEditTask(): {
+    editTask: (id: number, title: string, description: string | null, due_date: string | null, to_do_date: string | null, list_id: number | null, label_ids: number[] | null) => Promise<void>;
+    loading: boolean;
 };

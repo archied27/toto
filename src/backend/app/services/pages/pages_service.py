@@ -1,5 +1,6 @@
 from app.core.core import Core
 from app.services.pages.pages_state import PagesState, Page
+from dataclasses import asdict
 
 class PageService:
     def __init__(self, core: Core):
@@ -29,7 +30,7 @@ class PageService:
         if new_state.pages != self.state.pages:
             self.state = new_state
             await self.core.state.set("pages", new_state)
-            await self.core.bus.emit("pages.changed", self.state.pages)
+            await self.core.bus.emit("pages.changed", [asdict(page) for page in new_state.pages])
 
     def get_state(self) -> PagesState:
         return self.state

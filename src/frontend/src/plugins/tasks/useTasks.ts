@@ -1,5 +1,5 @@
 import { apiFetch } from "@/hooks/api";
-import { useWebSocketContext } from "@/hooks/WebSocketContext";
+import { useWebSocketEvent } from "@/hooks/useWebSocketEvent";
 import { useCallback, useEffect, useState } from "react";
 
 export interface Label {
@@ -33,9 +33,8 @@ export interface TaskState {
 
 export function useTaskState() {
     const [taskState, setTaskState] = useState<TaskState | null>(null);
-    const { useEvent } = useWebSocketContext();
 
-    useEffect(() => {
+    const getTasks = useCallback(() => {
         apiFetch<TaskState>("/tasks/state")
             .then(data => {
                 setTaskState(data);
@@ -43,16 +42,17 @@ export function useTaskState() {
             .catch(() => {
                 console.error("Failed to fetch task state");
             });
+    }, [])
+
+    useEffect(() => {
+        getTasks();
     }, []);
 
-    const handleUpdate = useCallback((data: unknown) => {
-        console.log("Received task state update:", data);
-        setTaskState(data as TaskState);
-    }, []);
+    useWebSocketEvent<TaskState>("tasks.state_updated", (newState) => {
+        setTaskState(newState);
+    });
 
-    useEvent("tasks.state_updated", handleUpdate);
-
-    return { taskState };
+    return { taskState, getTasks };
 }
 
 export function useGetTaskLists() {
@@ -263,4 +263,62 @@ export function useGetUpcomingTasks() {
     useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
     return { tasks, refetch: fetchTasks };
+}
+
+export function useToggleTaskCompletion() {
+    const [loading, setLoading] = useState(false);
+
+    const toggleCompletion = useCallback(async (taskId: number) => {
+        setLoading(true);
+        try {
+            await apiFetch(`/tasks/toggle_task_completion/${taskId}`, {
+                method: "PUT",
+            });
+        } catch (error) {
+            console.error("Failed to toggle task completion", error);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    return { toggleCompletion, loading };
+}
+
+export function useDeleteTask() {
+    const [loading, setLoading] = useState(false);
+
+    const deleteTask = useCallback(async (taskId: number) => {
+        setLoading(true);
+        try {
+            await apiFetch(`/tasks/delete_task/${taskId}`, {
+                method: "DELETE",
+            });
+        } catch (error) {
+            console.error("Failed to delete task", error);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    return { deleteTask, loading };
+}
+
+export function useEditTask() {
+    const [loading, setLoading] = useState(false);
+
+    const editTask = useCallback(async (id: number, title: string, description: string | null, due_date: string | null, to_do_date: string | null, list_id: number | null, label_ids: number[] | null) => {
+        setLoading(true);
+        try {
+            await apiFetch(`/tasks/update_task?id=${id}`, {
+                method: "PUT",
+                body: JSON.stringify({ title, description, due_date, to_do_date, list_id, label_ids }),
+            });
+        } catch (error) {
+            console.error("Failed to edit task", error);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    return { editTask, loading };
 }
