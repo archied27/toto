@@ -10,7 +10,6 @@ class DashboardService:
         self.core.scheduler.add_recurring("dashboard.rerank", minute="*/1") # rerank every minute 
 
     async def rerank(self) -> None:
-        print("Reranking dashboard slots")
         new_state = DashboardState()
 
         active_plugins = [
@@ -18,8 +17,6 @@ class DashboardService:
             for plugin_id, data in self.core.state.get_all()
             if getattr(data, "dashboard_priority", 0) != 0
         ]
-
-        print(f"Active plugins: {active_plugins}")
         
         active_plugins.sort(key=lambda x:x[1], reverse=True)
 

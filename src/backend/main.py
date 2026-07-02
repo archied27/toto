@@ -11,6 +11,7 @@ from app.core.scheduler import Scheduler
 from app.core.background_worker import BackgroundWorker
 from app.core.websocket_manager import WebSocketManager
 from app.services.dashboard.dashboard_service import DashboardService
+from app.services.pages.pages_service import PageService
 from app.db.manager import DBManager
 from app.core.core import Core
 from app.core.command import router as CommandRouter
@@ -34,8 +35,9 @@ async def lifespan(app: FastAPI):
     core = Core(event_bus, bg_worker, scheduler, db_manager, state)
 
     await ws_manager.forward("dashboard.changed")
+    await ws_manager.forward("pages.changed")
     dashboard = DashboardService(core)
-
+    pages = PageService(core)
 
     plugin_manager = PluginManager(core, app, ws_manager)
     await plugin_manager.register_plugins()
@@ -50,6 +52,12 @@ async def lifespan(app: FastAPI):
     app.state.state = state
     app.state.ws_manager = ws_manager
     app.state.dashboard_service = dashboard
+    app.state.pages_service = pages
+
+    # load initial state for dashboard and pages
+    await pages.update_pages()
+    await dashboard.rerank()
+
     yield
 
     await plugin_manager.save_all_states()
@@ -94,6 +102,10 @@ async def handle_command(req: dict):
 @app.get("/dashboard")
 async def get_dashboard_state():
     return app.state.dashboard_service.get_state()
+
+@app.get("/pages")
+async def get_pages_state():
+    return app.state.pages_service.get_state()
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
