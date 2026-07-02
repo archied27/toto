@@ -29,7 +29,8 @@ class TasksRouter:
         self.router.add_api_route("/edit_list", self.edit_list, methods=["PUT"])
         self.router.add_api_route("/get_tomorrow_tasks", self.get_tomorrow_tasks, methods=["GET"])
         self.router.add_api_route("/get_upcoming_tasks", self.get_upcoming_tasks, methods=["GET"])
-
+        self.router.add_api_route("/toggle_task_completion/{task_id}", self.toggle_task_completion, methods=["PUT"])
+        
     async def add_task(self, task: CreateTask):
         await self.controller.add_task(task)
         return {"message": "Task added successfully"}
@@ -42,8 +43,8 @@ class TasksRouter:
         await self.controller.delete_task(task_id)
         return {"message": "Task deleted successfully"}
 
-    async def update_task(self, task: CreateTask):
-        await self.controller.update_task(task)
+    async def update_task(self, task: CreateTask, id: int):
+        await self.controller.update_task(task, id)
         return {"message": "Task updated successfully"}
 
     async def get_task(self, task_id: str):
@@ -101,3 +102,7 @@ class TasksRouter:
     async def get_upcoming_tasks(self):
         tasks = await self.controller.get_upcoming_tasks()
         return tasks
+
+    async def toggle_task_completion(self, task_id: str):
+        await self.controller.toggle_task_completion(task_id)
+        return {"message": "Task completion toggled successfully"}

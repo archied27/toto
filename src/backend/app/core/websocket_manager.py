@@ -45,7 +45,6 @@ class WebSocketManager:
         sends data to all clients connected
         removes all which cannot send to
         """
-        print(f"broadcasting: {message}")
 
         async with self.lock:
             connections = list(self.connections)

@@ -10,19 +10,28 @@ class DashboardService:
         self.core.scheduler.add_recurring("dashboard.rerank", minute="*/1") # rerank every minute 
 
     async def rerank(self) -> None:
+        print("Reranking dashboard slots")
         new_state = DashboardState()
 
         active_plugins = [
-            (plugin_id, data["dashboard_priority"])
+            (plugin_id, getattr(data, "dashboard_priority", 0))
             for plugin_id, data in self.core.state.get_all()
-            if data.get("dashboard_priority", 0) != 0
+            if getattr(data, "dashboard_priority", 0) != 0
         ]
+
+        print(f"Active plugins: {active_plugins}")
         
         active_plugins.sort(key=lambda x:x[1], reverse=True)
 
-        for slot, (plugin_id, priority) in zip(new_state.slots, active_plugins):
-            slot.id = plugin_id
-            slot.priority = priority
+        # Assign the top 4 plugins to the dashboard slots
+        new_state.hero.id = active_plugins[0][0] if len(active_plugins) > 0 else None
+        new_state.hero.priority = active_plugins[0][1] if len(active_plugins) > 0 else 0
+        new_state.long.id = active_plugins[1][0] if len(active_plugins) > 1 else None
+        new_state.long.priority = active_plugins[1][1] if len(active_plugins) > 1 else 0
+        new_state.small_a.id = active_plugins[2][0] if len(active_plugins) > 2 else None
+        new_state.small_a.priority = active_plugins[2][1] if len(active_plugins) > 2 else 0
+        new_state.small_b.id = active_plugins[3][0] if len(active_plugins)  > 3 else None
+        new_state.small_b.priority = active_plugins[3][1] if len(active_plugins) > 3 else 0
 
         new_state.last_ranked = datetime.now(UTC)
         await self.handle_rerank(new_state)
@@ -32,6 +41,10 @@ class DashboardService:
         # slots have changed
         if new_state.slots != self.dashboard_state.slots:
             self.dashboard_state = new_state
+            await self.core.state.set("dashboard", new_state)
             await self.core.bus.emit("dashboard.changed", new_state.slots)
+
+    def get_state(self) -> DashboardState:
+        return self.dashboard_state
             
         

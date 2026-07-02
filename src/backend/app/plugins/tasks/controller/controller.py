@@ -42,6 +42,7 @@ class TasksController:
             # update the state with the new tasks
             await self.core.state.set("tasks", new_state)
             self.core.bus.emit_no_wait("tasks.state_updated", new_state.model_dump(mode="json"))
+            self.core.bus.emit_no_wait("dashboard.rerank")
 
     async def get_state(self) -> TasksState:
         # get the state of the tasks plugin
@@ -51,22 +52,14 @@ class TasksController:
             state = self.core.state.get("tasks")
         return state
 
-    async def update_priority(self):
-        # update the priority of the tasks plugin based on the number of overdue tasks and tasks due today
-        current_priority = self.core.state.get("tasks").dashboard_priority
-        new_priority = await self.get_current_priority()
-        if new_priority != current_priority:
-            await self.core.state.set("tasks", {"dashboard_priority": new_priority, "page_priority": new_priority})
-            self.core.bus.emit_no_wait("dashboard.rerank")
-
     async def get_current_priority(self) -> int:
         overdue_tasks = await self.db_controller.get_overdue_tasks()
         tasks_due_today = await self.db_controller.get_today_due_tasks()
         tasks_set_today = await self.db_controller.get_todays_tasks()
         priority = 0
-        priority += len(overdue_tasks) * 3
-        priority += len(tasks_due_today) * 2
-        priority += len(tasks_set_today) * 1
+        priority += len(overdue_tasks) * 40
+        priority += len([task for task in tasks_due_today if not task.completed]) * 30
+        priority += len([task for task in tasks_set_today if not task.completed]) * 20
         return min(priority, 100)
 
     async def add_task(self, task: CreateTask):
@@ -78,9 +71,9 @@ class TasksController:
         # get a task from the database
         return await self.db_controller.get_task(task_id)
 
-    async def update_task(self, task: CreateTask):
+    async def update_task(self, task: CreateTask, id: int):
         # update a task in the database
-        await self.db_controller.update_task(task)
+        await self.db_controller.update_task(task, id)
         await self.update_state()
 
     async def delete_task(self, task_id: str):
@@ -157,3 +150,8 @@ class TasksController:
     async def get_upcoming_tasks(self) -> list[Task]:
         # get all tasks that are due in the next 7 days
         return await self.db_controller.get_tasks_with_a_due_date()
+
+    async def toggle_task_completion(self, task_id: str):
+        # toggle the completion status of a task
+        await self.db_controller.toggle_task_completion(task_id)
+        await self.update_state()

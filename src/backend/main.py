@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
     app.state.core = core
     app.state.state = state
     app.state.ws_manager = ws_manager
-
+    app.state.dashboard_service = dashboard
     yield
 
     await plugin_manager.save_all_states()
@@ -90,6 +90,10 @@ async def handle_command(req: dict):
             "response": result.response_text,
             "data": result.data
         }
+
+@app.get("/dashboard")
+async def get_dashboard_state():
+    return app.state.dashboard_service.get_state()
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

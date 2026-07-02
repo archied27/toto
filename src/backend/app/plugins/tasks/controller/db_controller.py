@@ -201,24 +201,24 @@ class TasksDBController:
             tasks.append(self._build_task(row, labels, task_list))
         return tasks
 
-    async def update_task(self, task: CreateTask):
+    async def update_task(self, task: CreateTask, id: int):
         await self.core.db_manager.execute(
             """
             UPDATE tasks_tasks
-            SET title = ?, description = ?, due_date = ?, to_do_date = ?, completed = ?, list_id = ?
+            SET title = ?, description = ?, due_date = ?, to_do_date = ?, list_id = ?
             WHERE id = ?
             """,
-            (task.title, task.description, task.due_date, task.to_do_date, task.completed,
-             task.list_id if task.list_id else None, task.id)
+            (task.title, task.description, task.due_date, task.to_do_date,
+             task.list_id if task.list_id else None, id)
         )
         await self.core.db_manager.execute(
-            "DELETE FROM tasks_tasks_labels WHERE task_id = ?", (task.id,)
+            "DELETE FROM tasks_tasks_labels WHERE task_id = ?", (id,)
         )
-        if task.labels:
-            for label in task.labels:
+        if task.label_ids:
+            for label_id in task.label_ids:
                 await self.core.db_manager.execute(
                     "INSERT INTO tasks_tasks_labels (task_id, label_id) VALUES (?, ?)",
-                    (task.id, label.id)
+                    (id, label_id)
                 )
 
     async def delete_task(self, task_id: int):
@@ -291,3 +291,14 @@ class TasksDBController:
             task_list = await self._fetch_list_for_task(row["list_id"]) if row["list_id"] else None
             tasks.append(self._build_task(row, labels, task_list))
         return tasks
+
+    async def toggle_task_completion(self, task_id: int):
+        row = await self.core.db_manager.fetch_one(
+            "SELECT completed FROM tasks_tasks WHERE id = ?", (task_id,)
+        )
+        if not row:
+            return
+        new_status = not row["completed"]
+        await self.core.db_manager.execute(
+            "UPDATE tasks_tasks SET completed = ? WHERE id = ?", (new_status, task_id)
+        )
