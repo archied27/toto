@@ -5,48 +5,42 @@ Toto is a personal home assistant driven by an event-focused architecture. It ho
 
 ## Screenshots
 ### Dashboard
-This is what it looks like when only tasks has a priority
+Only tasks has a priority (left) vs nothing has any priority, i.e. all tasks have 0 dashboard priority (right)
 
-<img src="/docs/screenshots/dashboard_with_hero.jpeg" width="250">
-
-This is what it looks like when nothing has any priority (all tasks have 0 dashboard priority)
-
-<img src="/docs/screenshots/dashboard_no_widgets.jpeg" width="250">
+<table>
+  <tr>
+    <td><img src="/docs/screenshots/dashboard_with_hero.jpeg" width="180"></td>
+    <td><img src="/docs/screenshots/dashboard_no_widgets.jpeg" width="180"></td>
+  </tr>
+</table>
 
 ### Tasks
-Today tab
+Today tab, Add Task, Add a New List, Full Task Screen
 
-<img src="/docs/screenshots/tasks_today.jpeg" width="250">
-
-Add Task Screen
-
-<img src="/docs/screenshots/task_add.jpeg" width="250">
-
-Add a New List
-
-<img src="/docs/screenshots/task_add_list.jpeg" width="250">
-
-Full Task Screen
-
-<img src="/docs/screenshots/task_full_task.jpeg" width="250">
+<table>
+  <tr>
+    <td><img src="/docs/screenshots/tasks_today.jpeg" width="180"></td>
+    <td><img src="/docs/screenshots/task_add.jpeg" width="180"></td>
+    <td><img src="/docs/screenshots/task_add_list.jpeg" width="180"></td>
+    <td><img src="/docs/screenshots/task_full_task.jpeg" width="180"></td>
+  </tr>
+</table>
 
 ### Weather
-Today's Weather
+Today's Weather, Next Week's Weather, Weather Graphs
 
-<img src="/docs/screenshots/weather_main.jpeg" width="250">
-
-Next Weeks Weather
-
-<img src="/docs/screenshots/weather_next_mon.jpeg" width="250">
-
-Weather Graphs
-
-<img src="/docs/screenshots/weather_graphs.jpeg" width="250">
+<table>
+  <tr>
+    <td><img src="/docs/screenshots/weather_main.jpeg" width="180"></td>
+    <td><img src="/docs/screenshots/weather_next_mon.jpeg" width="180"></td>
+    <td><img src="/docs/screenshots/weather_graphs.jpeg" width="180"></td>
+  </tr>
+</table>
 
 ### Command Bar
 Using the weather's parsing
 
-<img src="/docs/screenshots/command_bar_weather.jpeg" width="250">
+<img src="/docs/screenshots/command_bar_weather.jpeg" width="180">
 
 ## Features
 The architecture provides many useful features in which the plugins use and are used to manage plugins
