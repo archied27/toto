@@ -19,9 +19,9 @@ function AppInner() {
   const [isCommandBar, setIsCommandBar] = useState(false)
 
   return (
-    <div className="dark h-full bg-background">
+    <div className="dark h-full bg-background flex flex-col">
       {isCommandBar && <CommandBar onClose={() => setIsCommandBar(false)} />}
-      <div className={`h-full transition-all duration-300 ease-in-out 
+      <div className={`flex-1 min-h-0 transition-all duration-300 ease-in-out 
         ${isCommandBar ? 'blur-sm brightness-50 pointer-events-none select-none' : ''}`}>
         <SwipeNavigator
           pages={pages}
@@ -37,7 +37,7 @@ function AppInner() {
 
 function App() {
   return (
-    <div className="dark h-screen bg-background pt-[env(safe-area-inset-top)]">
+    <div className="dark h-dvh bg-background pt-[env(safe-area-inset-top)]">
       <WebSocketProvider url={`wss://${window.location.host}${import.meta.env.VITE_WS_URL}`}>
         <NavigationProvider pageIds={pageIds}>
           <AppInner />

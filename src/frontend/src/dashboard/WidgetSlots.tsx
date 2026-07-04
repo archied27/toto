@@ -15,13 +15,23 @@ export default function WidgetSlots({ widgets }: WidgetSlotsProps) {
   if (!hero) return null
 
   return (
-    <div className="flex flex-col p-4 gap-2 h-full">
-      <div className="h-1/2">
+    <div className="flex flex-col p-4 gap-4 h-full">
+      <div className="h-[55%]">
         {hero && hero.component}
       </div>
-      {wide && wide.component}
-      {smallA && smallA.component}
-      {smallB && smallB.component}
+
+      <div className="h-[10%]">
+        {wide && wide.component}
+      </div>
+
+      <div className="flex flex-row gap-2 flex-1 min-h-0">
+        <div className="h-full w-[50%]">
+          {smallA && smallA.component}
+        </div>
+        <div className="h-full w-[50%]">
+          {smallB && smallB.component}
+        </div>
+      </div>
     </div>
   )
 }

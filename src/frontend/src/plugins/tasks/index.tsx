@@ -1,6 +1,6 @@
 import type { PluginManifest } from "../types";
 import TasksPage from "./TasksPage";
-import { TasksHero } from "./TasksWidgets";
+import { TasksHero, TasksLong, TasksSmall } from "./TasksWidgets";
 
 export default {
     id: 'tasks',
@@ -8,8 +8,8 @@ export default {
     page: TasksPage,
     widgets: {
         hero: TasksHero,
-        small: null,
-        wide: null
+        small: TasksSmall,
+        wide: TasksLong
     },
     commandRenderers: {}
 } satisfies PluginManifest

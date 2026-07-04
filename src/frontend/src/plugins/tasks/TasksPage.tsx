@@ -15,18 +15,30 @@ export default function TasksPage() {
 
     const [currentTasks, setCurrentTasks] = useState<Task[]>(taskState?.today_tasks || []);
     const [currentRefresh, setCurrentRefresh] = useState<() => void>(() => () => {});
-    const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
 
     const [addTaskPageOpen, setAddTaskPageOpen] = useState(false);
 
-    useEffect(() => {
-        setCompletedTasks(currentTasks.filter(task => task.completed));
-    }, [currentTasks]);
+    const overdueTasks = taskState?.overdue_tasks || [];
+    const overdueIds = overdueTasks.map(task => task.id);
+    const dedupedTasks = currentTasks.filter(task => !overdueIds.includes(task.id));
+
+    const completedTasks = dedupedTasks.filter(task => task.completed);
+    const incompleteTasks = dedupedTasks.filter(task => !task.completed);
 
     useEffect(() => {
         switch (currentTab) {
             case "Today":
-                setCurrentTasks(taskState?.today_tasks || []);
+                const merged = [
+                ...(taskState?.tasks_due_today || []),
+                ...(taskState?.today_tasks || []),
+                ];
+                const seen = new Set<number | string>();
+                const deduped = merged.filter(task => {
+                    if (seen.has(task.id)) return false;
+                    seen.add(task.id);
+                    return true;
+                });
+                setCurrentTasks(deduped);
                 setCurrentRefresh(() => () => getTasks);
                 break;
             case "Tomorrow":
@@ -69,20 +81,20 @@ export default function TasksPage() {
                 )}
 
                 <div className={`${addTaskPageOpen ? "opacity-50 blur pointer-events-none" : ""} gap-5 pt-5 flex flex-col flex-1 transition-opacity`}>
-                    <Hero selected={currentTab} total={currentTasks.length} completed={completedTasks.length} handleAddTask={() => setAddTaskPageOpen(true)} />
+                    <Hero selected={currentTab} total={dedupedTasks.length} completed={completedTasks.length} handleAddTask={() => setAddTaskPageOpen(true)} />
                     <TaskTabs currentTab={currentTab} onTabChange={handleTabChange} />
 
-                    {taskState?.overdue_tasks && taskState?.overdue_tasks.length > 0 && (
-                        <TaskList tasks={taskState.overdue_tasks} refresh={getAllTasks} title="Overdue Tasks" />
+                    {overdueTasks.length > 0 && (
+                        <TaskList tasks={overdueTasks} refresh={getAllTasks} title="Overdue Tasks" titleClassName="text-red-500" cardClassName="bg-red-500/25" />
                     )}
-                    {currentTasks.filter(task => !task.completed).length > 0 && (
-                        <TaskList tasks={currentTasks.filter(task => !task.completed)} refresh={currentRefresh} title="Pending Tasks" />
+                    {incompleteTasks.length > 0 && (
+                        <TaskList tasks={incompleteTasks} refresh={currentRefresh} title="To Do Tasks" />
                     )}
                     {completedTasks.length > 0  && (
-                        <TaskList tasks={completedTasks} refresh={currentRefresh} title="Completed Tasks" />
+                        <TaskList tasks={completedTasks} refresh={currentRefresh} title="Completed Tasks" titleClassName="text-muted-foreground" cardClassName="opacity-50" />
                     )}
 
-                    {currentTasks.length === 0 && completedTasks.length === 0 && (
+                    {dedupedTasks.length === 0 && (
                         <div className="flex flex-1 items-center justify-center">
                             <p className="text-sm text-muted-foreground">All Tasks Completed</p>
                         </div>

@@ -43,7 +43,7 @@ export default function DashboardPage() {
   const hasWidgets = widgetSlots.some(Boolean);
 
   return (
-    <div className="h-screen w-full flex flex-col overflow-hidden bg-background">
+    <div className="h-full pb-18 w-full flex flex-col overflow-hidden bg-background">
       {hasWidgets ? (
         <>
           <div className="shrink-0">

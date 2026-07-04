@@ -4,8 +4,8 @@ export declare const plugins: ({
     page: typeof import("./tasks/TasksPage").default;
     widgets: {
         hero: typeof import("./tasks/TasksWidgets").TasksHero;
-        small: null;
-        wide: null;
+        small: typeof import("./tasks/TasksWidgets").TasksSmall;
+        wide: typeof import("./tasks/TasksWidgets").TasksLong;
     };
     commandRenderers: {};
 } | {

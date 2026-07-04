@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { useDeleteTask, useToggleTaskCompletion, type Task } from "../useTasks";
-import { format, isToday, isTomorrow, isThisWeek, parseISO, startOfWeek, endOfWeek, addWeeks } from "date-fns";
+import { format, isToday, isTomorrow, isYesterday ,isThisWeek, parseISO, startOfWeek, endOfWeek, addWeeks } from "date-fns";
 import { getTextColour } from "../utils";
 import { Button } from "@/components/ui/button";
 import { CircleCheckIcon, CircleIcon, EditIcon, TrashIcon } from "lucide-react";
@@ -14,6 +14,7 @@ export function formatTaskDate(isoString: string): string {
 
   if (isToday(date)) return "Today";
   if (isTomorrow(date)) return "Tomorrow";
+  if (isYesterday(date)) return "Yesterday";
 
   if (isThisWeek(date, { weekStartsOn: 1 })) {
     return format(date, "EEEE");
@@ -29,7 +30,7 @@ export function formatTaskDate(isoString: string): string {
   return format(date, "do MMMM yyyy");
 }
 
-export default function TaskCard({ task, refresh }: { task: Task; refresh: () => void }) {
+export default function TaskCard({ task, refresh, className }: { task: Task; refresh: () => void; className?: string }) {
 
     const { toggleCompletion } = useToggleTaskCompletion();
     const { deleteTask } = useDeleteTask();
@@ -52,7 +53,7 @@ export default function TaskCard({ task, refresh }: { task: Task; refresh: () =>
     return (
         <Dialog>
             <DialogTrigger asChild>
-                <Card className="p-2 flex flex-row gap-2 border border-border/50 hover:border-border/80 transition-colors">
+                <Card className={`p-2 flex flex-row gap-2 border border-border/50 hover:border-border/80 transition-colors ${className || ""}`} onClick={(e) => e.stopPropagation()}>
                     <Button onClick={handleToggle} size={"icon"} className="self-center bg-muted h-8 w-8 border-2 border-border">
                         {task.completed ? (
                             <CircleCheckIcon className="w-4 h-4 text-green-500" />
@@ -97,11 +98,11 @@ export default function TaskCard({ task, refresh }: { task: Task; refresh: () =>
                 </DialogHeader>
 
                 <DialogDescription className="pt-0">
-                    <div className="flex flex-row justify-center gap-2">      
+                    <span className="flex flex-row justify-center gap-2">      
                         <span className="text-sm font-medium text-muted-foreground">{task.to_do_date && formatTaskDate(task.to_do_date)}</span>
                         {task.to_do_date && task.due_date && <span className="text-sm font-medium text-muted-foreground text-bold mx-1">|</span>}
                         <span className="text-sm font-medium text-muted-foreground">{task.due_date && "Due " + formatTaskDate(task.due_date)}</span>
-                    </div>
+                    </span>
                 </DialogDescription>
 
                 <p>{task.description}</p>
