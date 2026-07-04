@@ -41,6 +41,7 @@ class DashboardService:
             print(f"Dashboard slots updated: {new_state.slots}")
             await self.core.state.set("dashboard", new_state)
             await self.core.bus.emit("dashboard.changed", new_state.slots)
+        
 
     def get_state(self) -> DashboardState:
         return self.dashboard_state

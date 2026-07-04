@@ -1,4 +1,3 @@
-# base.py — the contract every plugin command module must follow
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional
@@ -17,23 +16,15 @@ class CommandResult:
     response_text: str
     data: dict
 
-class BaseCommand(ABC):
+@dataclass
+class IntentSpec:
     name: str
+    description: str
+    examples: list[str]
+    slots: Optional[type[BaseModel]] = None  # pydantic model if it needs extracted params
 
-    @abstractmethod
-    def match(self, raw: str, tokens: list[str]) -> Optional[MatchResult]:
-        """
-        Try to claim this input.
-        Return MatchResult if this plugin handles it.
-        Return None if it doesn't.
-        Never raises — absorb exceptions and return None.
-        """
-        pass
+class BaseCommand(ABC):
+    name: str # e.g weather, tasks, etc.
 
-    @abstractmethod
-    def handle(self, match: MatchResult, raw: str) -> CommandResult:
-        """
-        Execute the action.
-        Only called if match() returned a result.
-        """
-        pass
+    def get_intents(self) -> list[IntentSpec]: ...
+    async def handle(self, intent: str, extracted: dict, raw: str) -> CommandResult: ...

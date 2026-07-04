@@ -29,7 +29,7 @@ class TasksController:
 
         new_state = TasksState(
             dashboard_priority=await self.get_current_priority(),
-            page_priority=await self.get_current_priority(),
+            page_priority=max(await self.get_current_priority(), 5),
             base_priority=50,
             overdue_tasks=overdue_tasks,
             today_tasks=todays_tasks,

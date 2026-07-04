@@ -246,7 +246,7 @@ class TasksDBController:
 
     async def get_overdue_tasks(self) -> list[Task]:
         rows = await self.core.db_manager.fetch_all(
-            "SELECT * FROM tasks_tasks WHERE due_date < date('now') AND completed = 0"
+            "SELECT * FROM tasks_tasks WHERE (due_date < date('now') OR to_do_date < date('now')) AND completed = 0"
         )
         tasks = []
         for row in rows:
