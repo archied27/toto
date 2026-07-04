@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from 'react'
 
 interface NavigationContextType {
   currentIndex: number
@@ -10,14 +10,30 @@ interface NavigationContextType {
 const NavigationContext = createContext<NavigationContextType | null>(null)
 
 export function NavigationProvider({ pageIds, children }: { pageIds: string[], children: ReactNode }) {
-  const [currentIndex, setCurrentIndex] = useState(0)
+  const [currentId, setCurrentId] = useState<string | null>(pageIds[0] ?? null)
   const [params, setParams] = useState<Record<string, unknown>>({})
 
+  // If the page list changes and our current id disappeared, fall back gracefully.
+  useEffect(() => {
+    if (currentId === null && pageIds.length > 0) {
+      setCurrentId(pageIds[0])
+      return
+    }
+    if (currentId !== null && !pageIds.includes(currentId) && pageIds.length > 0) {
+      setCurrentId(pageIds[0])
+    }
+  }, [pageIds, currentId])
+
+  const currentIndex = useMemo(() => {
+    if (currentId === null) return 0
+    const index = pageIds.indexOf(currentId)
+    return index === -1 ? 0 : index
+  }, [pageIds, currentId])
+
   const navigate = (pageId: string, params?: Record<string, unknown>) => {
-    const index = pageIds.indexOf(pageId)
-    if (index !== -1) {
+    if (pageIds.includes(pageId)) {
       setParams(params ?? {})
-      setCurrentIndex(index)
+      setCurrentId(pageId)
     }
   }
 

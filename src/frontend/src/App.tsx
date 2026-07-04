@@ -10,9 +10,7 @@ import { pageRegistry, type AppPage } from './hooks/pageRegistry'
 function AppInner({ pages }: { pages: AppPage[] }) {
   const { currentIndex, navigate } = useNavigation()
   const [isCommandBar, setIsCommandBar] = useState(false)
-
   const pageIds = pages.map(page => page.id)
-
   return (
     <div className="dark h-full bg-background flex flex-col">
       {isCommandBar && <CommandBar onClose={() => setIsCommandBar(false)} />}
@@ -25,13 +23,13 @@ function AppInner({ pages }: { pages: AppPage[] }) {
         />
       </div>
       <DotsIndicator currentIndex={currentIndex} total={pages.length} onClick={() => setIsCommandBar(prev => !prev)} 
-      isCommandBar={isCommandBar} />
+        isCommandBar={isCommandBar} />
     </div>
   )
 }
 
-function App() {
-  const { pages: backendPages } = usePages();
+function AppContent() {
+  const { pages: backendPages } = usePages()
 
   const pages: AppPage[] = useMemo(
     () =>
@@ -40,20 +38,24 @@ function App() {
           id: page.id,
           component: pageRegistry[page.id],
         }))
-        .filter(
-          (page): page is AppPage => page.component !== undefined
-        ),
+        .filter((page): page is AppPage => page.component !== undefined),
     [backendPages]
-  );
+  )
 
-  const pageIds = pages.map(page => page.id);
+  const pageIds = pages.map(page => page.id)
 
   return (
-    <div className="dark h-dvh bg-background pt-[env(safe-area-inset-top)]">
+    <NavigationProvider pageIds={pageIds}>
+      <AppInner pages={pages} />
+    </NavigationProvider>
+  )
+}
+
+function App() {
+  return (
+    <div className="dark h-screen bg-background pt-[env(safe-area-inset-top)]">
       <WebSocketProvider url={`wss://${window.location.host}${import.meta.env.VITE_WS_URL}`}>
-        <NavigationProvider pageIds={pageIds}>
-          <AppInner pages={pages} />
-        </NavigationProvider>
+        <AppContent />
       </WebSocketProvider>
     </div>
   )
