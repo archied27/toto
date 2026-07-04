@@ -1,22 +1,17 @@
-import { useState } from 'react'
-import { plugins } from './plugins'
+import { useMemo, useState } from 'react'
 import SwipeNavigator from './components/SwipeNavigator'
 import DotsIndicator from './components/DotsIndicator'
-import DashboardPage from './dashboard/DashboardPage'
 import { WebSocketProvider } from './hooks/WebSocketContext'
 import { NavigationProvider, useNavigation } from './hooks/NavigationContext'
 import CommandBar from './components/CommandBar'
+import { usePages } from './hooks/usePages'
+import { pageRegistry, type AppPage } from './hooks/pageRegistry'
 
-const pages = [
-  {"id": "dashboard", "component": DashboardPage},
-  ...plugins.map(p => ({ id: p.id, component: p.page }))
-]
-
-const pageIds = pages.map(p => p.id)
-
-function AppInner() {
+function AppInner({ pages }: { pages: AppPage[] }) {
   const { currentIndex, navigate } = useNavigation()
   const [isCommandBar, setIsCommandBar] = useState(false)
+
+  const pageIds = pages.map(page => page.id)
 
   return (
     <div className="dark h-full bg-background flex flex-col">
@@ -36,11 +31,28 @@ function AppInner() {
 }
 
 function App() {
+  const { pages: backendPages } = usePages();
+
+  const pages: AppPage[] = useMemo(
+    () =>
+      backendPages
+        .map(page => ({
+          id: page.id,
+          component: pageRegistry[page.id],
+        }))
+        .filter(
+          (page): page is AppPage => page.component !== undefined
+        ),
+    [backendPages]
+  );
+
+  const pageIds = pages.map(page => page.id);
+
   return (
     <div className="dark h-dvh bg-background pt-[env(safe-area-inset-top)]">
       <WebSocketProvider url={`wss://${window.location.host}${import.meta.env.VITE_WS_URL}`}>
         <NavigationProvider pageIds={pageIds}>
-          <AppInner />
+          <AppInner pages={pages} />
         </NavigationProvider>
       </WebSocketProvider>
     </div>

@@ -39,7 +39,9 @@ export default function AddTask({ onClose }: { onClose?: () => void }) {
             <div className="px-3 flex flex-col gap-3 w-full">
                 <Input placeholder="What needs doing?" value={name} onChange={(e) => setName(e.target.value)} />
                 <Textarea placeholder="Description" value={description || ''} className="h-[100px]" onChange={(e) => setDescription(e.target.value)} />
-                <DatePicker placeholder="Do it when?" value={toDoDate} onChange={setToDoDate} />
+                <div>
+                    <DatePicker placeholder="Do it when?" value={toDoDate} onChange={setToDoDate} />
+                </div>
                 <DatePicker placeholder="When is it due?" value={dueDate} onChange={setDueDate} />
 
                 <div className="flex justify-center gap-3 w-full">

@@ -1,6 +1,6 @@
 "use client"
 import { format, parseISO } from "date-fns"
-import { ChevronDownIcon } from "lucide-react"
+import { CalendarIcon, ChevronDownIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -32,9 +32,11 @@ export function DatePicker({ placeholder, value, onChange }: DatePickerProps) {
             data-empty={!date}
             className="w-[212px] justify-between text-left font-normal data-[empty=true]:text-muted-foreground w-full"
           >
-            {date ? format(date, "PPP") : <span>{placeholder}</span>}
+            <CalendarIcon />
+            {date ? format(date, "PPP") : <span className="flex-1">{placeholder}</span>}
             <ChevronDownIcon />
           </Button>
+          
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0 bg-background" align="center">
           <Calendar

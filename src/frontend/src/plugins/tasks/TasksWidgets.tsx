@@ -1,4 +1,3 @@
-import { CardTitle } from "@/components/ui/card";
 import { useTaskState } from "./useTasks";
 import TaskCard from "./components/TaskCard";
 import { useNavigation } from "@/hooks/NavigationContext";
@@ -37,10 +36,6 @@ export function TasksHero() {
 
     return (
         <WidgetContainer onClick={() => navigate("tasks")}>
-            <CardTitle className="text-center">
-                Today's Tasks
-            </CardTitle>
-
             { /* Overdue Tasks */ }
             { showOverdueTasks && (
                 overdueCount > 0 ? (
@@ -121,21 +116,21 @@ export function TasksLong() {
 
     return (
         <WidgetContainer onClick={() => navigate("tasks")}>
-            <div className="flex flex-row justify-center items-stretch h-full divide-x divide-border">
+            <div className="flex flex-row justify-center items-stretch h-full divide-x divide-border/50">
                 {overdueCount > 0 && (
-                    <div className="flex flex-1 items-center justify-center gap-1.5 px-2">
+                    <div className="flex flex-1 items-center justify-center gap-1 px-1">
                         <CircleAlertIcon className="text-red-500 w-4 shrink-0" />
                         <p className="text-red-500 font-medium text-center text-sm">{overdueCount} Task{overdueCount !== 1 ? 's' : ''} Overdue</p>
                     </div>
                 )}
                 {dueTodayCount > 0 && (
-                    <div className="flex flex-1 items-center justify-center gap-1.5 px-2">
+                    <div className="flex flex-1 items-center justify-center gap-1 px-1">
                         <ClockIcon className="w-4 shrink-0" />
                         <p className="text-center font-medium text-foreground text-sm">{dueTodayCount} Task{dueTodayCount !== 1 ? 's' : ''} Due Today</p>
                     </div>
                 )}
                 {todayCount > 0 && (
-                    <div className="flex flex-1 items-center justify-center gap-1.5 px-2">
+                    <div className="flex flex-1 items-center justify-center gap-1 px-1">
                         <ClockIcon className="w-4 shrink-0" />
                         <p className="text-center font-medium text-foreground text-sm">{todayCount} Task{todayCount !== 1 ? 's' : ''} Today</p>
                     </div>
