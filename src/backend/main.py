@@ -90,7 +90,12 @@ async def handle_command(req: dict):
     req = { input: str }
     """
     result = await CommandRouter.process(req["input"])
-    print(result)
+    print({
+            "success": result.success,
+            "action": result.action,
+            "response": result.response_text,
+            "data": result.data
+        })
     if result:
         return {
             "success": result.success,

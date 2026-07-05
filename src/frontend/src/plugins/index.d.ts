@@ -7,7 +7,15 @@ export declare const plugins: ({
         small: typeof import("./tasks/TasksWidgets").TasksSmall;
         wide: typeof import("./tasks/TasksWidgets").TasksLong;
     };
-    commandRenderers: {};
+    commandRenderers: {
+        today_tasks: ({ data }: {
+            data: any;
+        }) => import("react/jsx-runtime").JSX.Element;
+        tomorrow_tasks: ({ data }: {
+            data: any;
+        }) => import("react/jsx-runtime").JSX.Element;
+        show_tasks: () => undefined;
+    };
 } | {
     id: string;
     label: string;

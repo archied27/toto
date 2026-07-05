@@ -9,6 +9,14 @@ declare const _default: {
         small: typeof TasksSmall;
         wide: typeof TasksLong;
     };
-    commandRenderers: {};
+    commandRenderers: {
+        today_tasks: ({ data }: {
+            data: any;
+        }) => import("react/jsx-runtime").JSX.Element;
+        tomorrow_tasks: ({ data }: {
+            data: any;
+        }) => import("react/jsx-runtime").JSX.Element;
+        show_tasks: () => undefined;
+    };
 };
 export default _default;

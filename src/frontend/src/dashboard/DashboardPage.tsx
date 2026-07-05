@@ -6,14 +6,14 @@ import { useWeather } from "@/plugins/weather/useWeather";
 import { useDashboard, type DashboardSlot } from "@/hooks/useDashboard";
 import { plugins } from "@/plugins";
 
-interface WidgetSlot {
+export interface WidgetSlot {
   id: string;
   component: ReactNode;
 }
 
 const pluginMap = Object.fromEntries(plugins.map((p) => [p.id, p]));
 
-function resolveSlot(
+export function resolveSlot(
   slot: DashboardSlot | null,
   size: "hero" | "wide" | "small"
 ): WidgetSlot | null {

@@ -11,9 +11,9 @@ class WeatherCommand(BaseCommand):
             IntentSpec("show_weather", "open the weather app/screen",
                        ["show weather", "open weather", "display weather"]),
             IntentSpec("show_pollen", "get current pollen/allergen levels",
-                       ["pollen count", "how bad is pollen today", "grass pollen"]),
+                       ["pollen count", "how bad is pollen today", "grass pollen", "hayfever today", "pollen levels"]),
             IntentSpec("show_current_weather", "get current temperature and conditions",
-                       ["what's the weather", "weather today", "forecast today", "is it cold outside"]),
+                       ["what's the weather", "weather today", "forecast today", "is it cold outside", "what's the weather today"]),
         ]
 
     async def handle(self, intent: str, extracted: dict, raw: str) -> CommandResult:

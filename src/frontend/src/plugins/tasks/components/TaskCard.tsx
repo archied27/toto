@@ -64,27 +64,27 @@ export default function TaskCard({ task, refresh, className }: { task: Task; ref
 
                     <div className="flex flex-col gap-1 flex-1">
 
-                    <h1 className="font-semibold text-foreground">{task.title}</h1>
+                        <h1 className="font-semibold text-foreground">{task.title}</h1>
 
-                    <div className="flex flex-row">
-                        <span className="text-xs text-muted-foreground">{task.to_do_date && formatTaskDate(task.to_do_date)}</span>
-                        {task.to_do_date && task.due_date && <span className="text-xs text-muted-foreground text-bold mx-1">|</span>}
-                        <span className="text-xs text-muted-foreground">{task.due_date && "Due " + formatTaskDate(task.due_date)}</span>
-                    </div>
+                        <div className="flex flex-row">
+                            <span className="text-xs text-muted-foreground">{task.to_do_date && formatTaskDate(task.to_do_date)}</span>
+                            {task.to_do_date && task.due_date && <span className="text-xs text-muted-foreground text-bold mx-1">|</span>}
+                            <span className="text-xs text-muted-foreground">{task.due_date && "Due " + formatTaskDate(task.due_date)}</span>
+                        </div>
 
-                    <div className="flex flex-row flex-wrap gap-1">
-                        {task.task_list && (
-                            <span style={{ backgroundColor: task.task_list.colour, color: getTextColour(task.task_list.colour) }} className="px-2 py-0.5 rounded-full text-xs text-foreground">
-                                    {task.task_list.name}
-                            </span>
-                        )}
+                        <div className="flex flex-row flex-wrap gap-1">
+                            {task.task_list && (
+                                <span style={{ backgroundColor: task.task_list.colour, color: getTextColour(task.task_list.colour) }} className="px-2 py-0.5 rounded-full text-xs text-foreground">
+                                        {task.task_list.name}
+                                </span>
+                            )}
 
-                        {task.labels?.map(label => (
-                            <span key={label.id} style={{ backgroundColor: label.colour, color: getTextColour(label.colour) }} className="px-2 py-0.5 rounded-full text-xs text-foreground">
-                                {label.name}
-                            </span>
-                        ))}
-                    </div>
+                            {task.labels?.map(label => (
+                                <span key={label.id} style={{ backgroundColor: label.colour, color: getTextColour(label.colour) }} className="px-2 py-0.5 rounded-full text-xs text-foreground">
+                                    {label.name}
+                                </span>
+                            ))}
+                        </div>
 
                     </div>
                 </Card>

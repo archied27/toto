@@ -3,7 +3,7 @@ import { useState } from "react";
 export interface CommandResult {
   success: boolean;
   action: string;
-  response_text: string;
+  response: string;
   data: Record<string, any>;
 }
 
