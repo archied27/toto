@@ -1,30 +1,20 @@
-// CommandBar.tsx
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Input } from "./ui/input";
 import { useNavigation } from "@/hooks/NavigationContext";
 import CommandResultRenderer from "./CommandResultRenderer";
 import type { CommandResult } from "@/plugins/types";
 import { apiFetch } from "@/hooks/api";
-import { useDashboard } from "@/hooks/useDashboard";
-import { resolveSlot, type WidgetSlot } from "@/dashboard/DashboardPage";
 
 export default function CommandBar({
-  onClose,
+  onClose, longComponent
 }: {
   onClose: () => void;
+  longComponent?: React.ReactNode;
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [result, setResult] = useState<CommandResult | null>(null);
   const [loading, setLoading] = useState(false);
   const { navigate } = useNavigation();
-  const { slots } = useDashboard()
-
-  const [longSlot, setLongSlot] = useState<WidgetSlot | null>(null);
-
-  useEffect(() => {
-    const resolvedLongSlot = resolveSlot(slots.hero, "wide");
-    setLongSlot(resolvedLongSlot);
-  }, [slots]);
 
   const handleSubmit = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== "Enter" || !searchTerm.trim()) return;
@@ -60,7 +50,7 @@ export default function CommandBar({
         {result ? <CommandResultRenderer result={result} /> : 
         (<div className="flex flex-col h-full">
             <div className="h-[10%] opacity-80">
-              {longSlot?.component}
+              {longComponent}
             </div>
           </div>)}
       </div>

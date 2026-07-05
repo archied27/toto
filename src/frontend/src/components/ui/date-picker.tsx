@@ -44,6 +44,7 @@ export function DatePicker({ placeholder, value, onChange }: DatePickerProps) {
             selected={date}
             onSelect={handleSelect}
             defaultMonth={date}
+            weekStartsOn={1}
           />
         </PopoverContent>
       </Popover>

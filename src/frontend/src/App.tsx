@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import SwipeNavigator from './components/SwipeNavigator'
 import DotsIndicator from './components/DotsIndicator'
 import { WebSocketProvider } from './hooks/WebSocketContext'
@@ -6,14 +6,25 @@ import { NavigationProvider, useNavigation } from './hooks/NavigationContext'
 import CommandBar from './components/CommandBar'
 import { usePages } from './hooks/usePages'
 import { pageRegistry, type AppPage } from './hooks/pageRegistry'
+import { type WidgetSlot, resolveSlot } from './dashboard/DashboardPage'
+import { useDashboard } from './hooks/useDashboard'
 
 function AppInner({ pages }: { pages: AppPage[] }) {
   const { currentIndex, navigate } = useNavigation()
+  const { slots } = useDashboard()
+  const [longSlot, setLongSlot] = useState<WidgetSlot | null>(null);
+
+  useEffect(() => {
+    const resolvedLongSlot = resolveSlot(slots.hero, "wide");
+    setLongSlot(resolvedLongSlot);
+  }, [slots]);
+
   const [isCommandBar, setIsCommandBar] = useState(false)
   const pageIds = pages.map(page => page.id)
+
   return (
     <div className="dark h-full bg-background flex flex-col">
-      {isCommandBar && <CommandBar onClose={() => setIsCommandBar(false)} />}
+      {isCommandBar && <CommandBar onClose={() => setIsCommandBar(false)} longComponent={longSlot?.component} />}
       <div className={`flex-1 min-h-0 transition-all duration-300 ease-in-out 
         ${isCommandBar ? 'blur-sm brightness-50 pointer-events-none select-none' : ''}`}>
         <SwipeNavigator
