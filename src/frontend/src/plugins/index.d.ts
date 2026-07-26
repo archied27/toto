@@ -14,7 +14,14 @@ export declare const plugins: ({
         tomorrow_tasks: ({ data }: {
             data: any;
         }) => import("react/jsx-runtime").JSX.Element;
+        upcoming_tasks: ({ data }: {
+            data: any;
+        }) => import("react/jsx-runtime").JSX.Element;
         show_tasks: () => undefined;
+        show_add_task: () => undefined;
+        add_task: ({ data }: {
+            data: any;
+        }) => import("react/jsx-runtime").JSX.Element;
     };
 } | {
     id: string;

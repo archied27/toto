@@ -10,3 +10,9 @@ export declare function useCommandBar(): {
     execute: (input: string) => Promise<void>;
     clear: () => void;
 };
+export declare function useCommandBarConfirm(): {
+    result: CommandResult | null;
+    loading: boolean;
+    execute: (input: string) => Promise<void>;
+    clear: () => void;
+};

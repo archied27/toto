@@ -4,6 +4,7 @@ import { useGetAllTasks, useGetTomorrowTasks, useGetUpcomingTasks, useTaskState,
 import TaskTabs from "./components/TaskTabs";
 import TaskList from "./components/TaskList";
 import AddTask from "./components/AddTask";
+import { useNavigation } from "@/hooks/NavigationContext";
 
 export default function TasksPage() {
     const { taskState, getTasks } = useTaskState();
@@ -15,6 +16,8 @@ export default function TasksPage() {
 
     const [currentTasks, setCurrentTasks] = useState<Task[]>(taskState?.today_tasks || []);
     const [currentRefresh, setCurrentRefresh] = useState<() => void>(() => () => {});
+
+    const { params } = useNavigation();
 
     const [addTaskPageOpen, setAddTaskPageOpen] = useState(false);
 
@@ -62,6 +65,12 @@ export default function TasksPage() {
         if (tab === "Upcoming") getUpcomingTasks();
         if (tab === "All") getAllTasks();
     };
+
+    useEffect(() => {
+        if (params?.addTask === true) {
+            setAddTaskPageOpen(true);
+        }
+    }, [params]);
 
     return (
         <div className="bg-background text-foreground px-3 pb-35 min-h-screen flex flex-col">

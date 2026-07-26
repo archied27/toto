@@ -44,7 +44,7 @@ Weather Graphs
 <img src="/docs/screenshots/weather_graphs.jpeg" width="250">
 
 ### Command Bar
-Using the weather's parsing
+Classified using intent classifier to show pollen levels
 
 <img src="/docs/screenshots/command_bar_weather.jpeg" width="250">
 
@@ -57,7 +57,7 @@ The architecture provides many useful features in which the plugins use and are 
 
 - **Command Endpoint**
     
-    This is where the command bar is used, where each plugin currently provides their own parser (using regex) and the endpoint takes in text and returns a response from a plugin. A future upgrade is to use an intent classifier with a local LLM for data extraction and as a fallback if no match is found.
+    This is where the command bar is used, where each plugin provides possible commands with examples and a description which is used by an intent classifier to select one (or none). If the confidence score is between 0.5 and the set threshold, then a confirmation is asked. A lightweight local LLM is used for data extraction. 
 
 - **Websocket Manager**
 
@@ -123,7 +123,7 @@ The tasks plugin provides adding scheduled tasks with to do dates as well as due
 
 ### General
 - [ ] Push Notifications
-- [ ] Intent Classifier for command bar with LLM extraction and fallback
+- [x] Intent Classifier for command bar with LLM extraction and fallback
 
 ### Future Upgrades
 

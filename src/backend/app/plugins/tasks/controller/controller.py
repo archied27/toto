@@ -65,8 +65,9 @@ class TasksController:
 
     async def add_task(self, task: CreateTask):
         # add a task to the database
-        await self.db_controller.add_task(task)
+        id = await self.db_controller.add_task(task)
         await self.update_state()
+        return id
 
     async def get_task(self, task_id: str) -> Task:
         # get a task from the database

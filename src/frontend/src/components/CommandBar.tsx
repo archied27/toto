@@ -4,6 +4,7 @@ import { useNavigation } from "@/hooks/NavigationContext";
 import CommandResultRenderer from "./CommandResultRenderer";
 import type { CommandResult } from "@/plugins/types";
 import { apiFetch } from "@/hooks/api";
+import { LoaderCircleIcon } from "lucide-react";
 
 export default function CommandBar({
   onClose, longComponent
@@ -31,7 +32,7 @@ export default function CommandBar({
       if (!data) return;
 
       if (data.action === "navigate" && data.data?.navigate_to) {
-        navigate(data.data.navigate_to);
+        navigate(data.data.navigate_to, data.data?.params);
         onClose();
         return;
       }
@@ -47,7 +48,7 @@ export default function CommandBar({
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-between pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       <div className="flex-1 overflow-y-auto px-4 pt-4">
-        {result ? <CommandResultRenderer result={result} /> : 
+        {result ? <CommandResultRenderer result={result} onResult={setResult} /> : 
         (<div className="flex flex-col h-full">
             <div className="h-[10%] opacity-80">
               {longComponent}
@@ -55,14 +56,19 @@ export default function CommandBar({
           </div>)}
       </div>
       <div className="pb-12 px-4 flex flex-col items-center gap-4">
-        <Input
-          className="text-foreground"
-          placeholder="Type a command..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          onKeyDown={handleSubmit}
-          disabled={loading}
-        />
+        <div className="relative w-full">
+          <Input
+            className="text-foreground pr-10"
+            placeholder="Type a command..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={handleSubmit}
+            disabled={loading}
+          />
+          {loading && (
+            <LoaderCircleIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground animate-spin" />
+          )}
+        </div>
       </div>
     </div>
   );

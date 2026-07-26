@@ -90,12 +90,20 @@ async def handle_command(req: dict):
     req = { input: str }
     """
     result = await CommandRouter.process(req["input"])
-    print({
+    if result:
+        return {
             "success": result.success,
             "action": result.action,
             "response": result.response_text,
             "data": result.data
-        })
+        }
+
+@app.post("/command/confirm")
+async def confirm_command(req: dict):
+    """
+    req = { intent: str, plugin: str, raw: str }
+    """
+    result = await CommandRouter.confirm(req["intent"], req["plugin"], req["raw"])
     if result:
         return {
             "success": result.success,

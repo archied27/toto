@@ -164,6 +164,8 @@ class TasksDBController:
                     (last_id, label_id)
                 )
 
+        return last_id
+
     async def get_task(self, task_id: int) -> Task | None:
         row = await self.core.db_manager.fetch_one(
             "SELECT * FROM tasks_tasks WHERE id = ?", (task_id,)
