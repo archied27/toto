@@ -6,14 +6,15 @@ from typing import Optional
 
 from app.ai.intent_classsifier import IntentSimilarityModel
 from app.schemas.base_command import BaseCommand, MatchResult, CommandResult
-from app.ai.llm import Extractor
+from app.ai.llm import Extractor, GeneralLLM
 
 
 class CommandRouter:
-    def __init__(self, intent_classifier: IntentSimilarityModel, llm_extractor: Extractor, classifier_confidence_threshold: float = 0.7):
+    def __init__(self, intent_classifier: IntentSimilarityModel, llm_extractor: Extractor, groq_llm: GeneralLLM, classifier_confidence_threshold: float = 0.7):
         self.plugins: list[BaseCommand] = []
         self.classifier = intent_classifier
         self.llm_extractor = llm_extractor
+        self.groq_llm = groq_llm
         self.confidence_threshold = classifier_confidence_threshold
         self._built = False
 
@@ -60,7 +61,22 @@ class CommandRouter:
                     }
                 )
             else:
-                return CommandResult(success=False, action='LOW_CONFIDENCE', response_text="No suitable match found", data={})
+                # fall through to llm general response
+                try:
+                    answer = await asyncio.to_thread(self.groq_llm.ask, raw)
+                    return CommandResult(
+                        success=True,
+                        action='LLM_RESPONSE',
+                        response_text=answer,
+                        data={},
+                    )
+                except Exception as e:
+                    return CommandResult(
+                        success=False,
+                        action='LLM_ERROR',
+                        response_text=f"Error in LLM response: {str(e)}",
+                        data={},
+                    )
 
         plugin = self._get_plugin(match.plugin)
         if not plugin:
@@ -120,4 +136,5 @@ class CommandRouter:
 router = CommandRouter(
     intent_classifier=IntentSimilarityModel(),
     llm_extractor=Extractor(model_path="app/ai/models/qwen2.5-1.5b-instruct-q4_k_m.gguf"),
+    groq_llm=GeneralLLM(model="openai/gpt-oss-120b"),
 )

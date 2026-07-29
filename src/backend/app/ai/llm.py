@@ -2,11 +2,18 @@ from llama_cpp import Llama
 from app.schemas.base_command import IntentSpec
 import json
 import logging
+import os
+import dotenv
+from groq import Groq
 
 logger = logging.getLogger(__name__)
 
+dotenv.load_dotenv()
 
 class Extractor:
+    """
+    local llm used for data extraction
+    """
     def __init__(self, model_path: str, n_ctx: int = 1024):
         self.model = Llama(model_path=model_path, n_ctx=n_ctx)
 
@@ -60,3 +67,35 @@ class Extractor:
         except json.JSONDecodeError:
             logger.error(f"Extractor returned invalid JSON for intent={spec.name}: {content!r}")
             raise
+
+class GeneralLLM:
+    """
+    groq llm used for general purposes
+    """
+    def __init__(self, model: str = "llama-3.3-70b-versatile"):
+        self.client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        self.model = model
+
+    def ask(self, question: str, context: str | None = None) -> str:
+        system_prompt = (
+            "You are a helpful assistant answering questions grounded in the "
+            "provided data. If context is given, answer only using that context - "
+            "do not invent details. If no context is given, answer from general "
+            "knowledge, and say clearly if you don't know."
+            "Provide short to medium length answers."
+            "Your response are rendered using GitHub Flavored Markdown in a React application"
+            "Use Markdown only, use headings to organise your responses, starting with h2's"
+            "Do not use filler such as 'Certainly!'"
+        )
+
+        user_content = question if not context else f"Context:\n{context}\n\nQuestion: {question}"
+
+        resp = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ],
+            temperature=0.3,
+        )
+        return resp.choices[0].message.content

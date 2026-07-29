@@ -10,6 +10,34 @@ class TMDBApiController:
         self.api_key = api_key
         self.base_url = 'https://api.themoviedb.org/3'
 
+    async def search_tmdb(self, query: str, page: int = 1):
+        """
+        searches tmdb for movies and series matching the query
+        """
+        data = None
+
+        url = f"{self.base_url}/search/multi"
+        params = {"api_key": self.api_key, "query": query, "page": page}
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params) as response:
+                response.raise_for_status()
+                if response.status == 200:
+                    data = await response.json()
+        
+        if data == None:
+            return None
+
+        results = []
+        for result in data["results"]:
+            if result["media_type"] == "movie":
+                results.append({"id": result["id"], "title": result["title"], "poster_path": result["poster_path"],
+                "media_type": "movie", "release_date": result["release_date"]})
+            elif result["media_type"] == "tv":
+                results.append({"id": result["id"], "title": result["name"], "poster_path": result["poster_path"],
+                "media_type": "show", "release_date": result["first_air_date"]})
+        return results
+
     async def get_movie_details(self, id: int):
         """
         fetches and returns movie details

@@ -26,19 +26,11 @@ export declare const plugins: ({
 } | {
     id: string;
     label: string;
-    page: typeof import("./weather/WeatherPage").default;
+    page: typeof import("./media/MediaPage").MediaPage;
     widgets: {
         hero: null;
         small: null;
         wide: null;
     };
-    commandRenderers: {
-        show_pollen: ({ data }: {
-            data: any;
-        }) => import("react/jsx-runtime").JSX.Element;
-        show_weather: () => undefined;
-        show_current_weather: ({ data }: {
-            data: any;
-        }) => import("react/jsx-runtime").JSX.Element;
-    };
+    commandRenderers: {};
 })[];

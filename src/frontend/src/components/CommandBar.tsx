@@ -55,7 +55,7 @@ export default function CommandBar({
             </div>
           </div>)}
       </div>
-      <div className="pb-12 px-4 flex flex-col items-center gap-4">
+      <div className="pb-12 pt-10 px-4 flex flex-col items-center gap-4">
         <div className="relative w-full">
           <Input
             className="text-foreground pr-10"

@@ -1,2 +1,0 @@
-class SimpleMovie:
-    pass

@@ -1,10 +1,11 @@
 """
-handles logic for mpv plugin
+handles logic for media plugin
 """
 
-from app.plugins.mpv.controller.db import MPVDb
-from app.plugins.mpv.controller.mpv_socket_controller import MPVSocket
-from app.plugins.mpv.controller.tmdb_controller import TMDBApiController
+from app.plugins.media.controller.db import MPVDb
+from app.plugins.media.controller.mpv_socket_controller import MPVSocket
+from app.plugins.media.controller.tmdb_controller import TMDBApiController
+from app.plugins.media.schemas import MPVState
 from app.core.core import Core
 from app.core.background_worker import Task
 import subprocess
@@ -17,8 +18,14 @@ class MPVController:
         self.db = MPVDb(self.core.db_manager)
         self.socket_manager = MPVSocket("/tmp/mpvsocket")
 
+    async def update_state(self):
+        new_state = MPVState()
+        print("updating mpv state" + str(new_state))
+        await self.core.state.set("media", new_state)
+        self.core.bus.emit_no_wait("pages.rerank")
+
     async def setup(self):
-        with open("app/plugins/mpv/config.json", "r") as json_f:
+        with open("app/plugins/media/config.json", "r") as json_f:
             data = json.load(json_f)
 
         self.tmdb = TMDBApiController(data["tmdb-api-key"])
@@ -30,6 +37,13 @@ class MPVController:
         self.core.bg_worker.register_handler("mpv.cleanup_db", self.cleanup_db)
 
         await self.db.initialise_db()
+        await self.update_state()
+
+    async def search_tmdb(self, query: str):
+        """
+        searches tmdb for movies and series matching the query
+        """
+        return await self.tmdb.search_tmdb(query)
 
     async def update_db(self):
         """
