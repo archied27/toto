@@ -31,11 +31,15 @@ class TMDBApiController:
         results = []
         for result in data["results"]:
             if result["media_type"] == "movie":
+                release_type = await self.get_movie_release_details(result["id"])
+
                 results.append({"id": result["id"], "title": result["title"], "poster_path": result["poster_path"],
-                "media_type": "movie", "release_date": result["release_date"]})
+                "media_type": "movie", "release_date": result["release_date"], "release_type": release_type})
+
+
             elif result["media_type"] == "tv":
                 results.append({"id": result["id"], "title": result["name"], "poster_path": result["poster_path"],
-                "media_type": "show", "release_date": result["first_air_date"]})
+                "media_type": "show", "release_date": result["first_air_date"], "release_type": 6})
         return results
 
     async def get_movie_details(self, id: int):
@@ -66,12 +70,15 @@ class TMDBApiController:
                         if (logo["iso_639_1"] == "en") and (logo["vote_average"] > best):
                             logo_path = logo["file_path"]
 
+        release_type = await self.get_movie_release_details(id)
+
         if data == None:
             return None
 
         return {"title": data["title"], "poster_path": data["poster_path"], 
         "backdrop_path": data["backdrop_path"], "description": data["overview"],
-        "release_date": data["release_date"], "logo_path": logo_path}
+        "release_date": data["release_date"], "logo_path": logo_path, "duration_seconds": data["runtime"]*60, 
+        "release_type": release_type}
 
     async def get_series_details(self, id: int):
         """
@@ -130,3 +137,32 @@ class TMDBApiController:
             episodes.append({"episode_num": episode["episode_number"], "title": episode["name"],
             "description": episode["overview"], "still_path": episode["still_path"]})
         return ({"title": data["name"], "air_date": data["air_date"], "poster_path": data["poster_path"]}, episodes)
+
+    async def get_movie_release_details(self, id: int):
+        """
+        fetches and returns movie release details
+        returns 0 if no release details are found,
+        1 if premiere, 2 if theatrical limited, 3 if theatrical, 
+        4 if digital, 5 if physical, 6 if tv
+        """
+        data = None
+        type = 0
+
+        url = f"{self.base_url}/movie/{id}/release_dates"
+        params = {"api_key": self.api_key}
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params) as response:
+                response.raise_for_status()
+                if response.status == 200:
+                    data = await response.json()
+
+        if data == None:
+            return 0
+
+        for result in data["results"]:
+            for release in result["release_dates"]:
+                if release["type"] > type:
+                    type = release["type"]
+
+        return type if type != 0 else 6

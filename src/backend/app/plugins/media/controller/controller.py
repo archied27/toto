@@ -45,6 +45,18 @@ class MPVController:
         """
         return await self.tmdb.search_tmdb(query)
 
+    async def get_movie_details(self, id: int):
+        """
+        fetches and returns movie details
+        """
+        return await self.tmdb.get_movie_details(id)
+
+    async def get_series_details(self, id: int):
+        """
+        fetches and returns series details
+        """
+        return await self.tmdb.get_series_details(id)
+
     async def update_db(self):
         """
         syncs the database with files on computer
