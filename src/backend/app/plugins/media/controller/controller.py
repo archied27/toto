@@ -57,6 +57,19 @@ class MPVController:
         """
         return await self.tmdb.get_series_details(id)
 
+    async def get_full_series_details(self, id: int):
+        """
+        fetches and returns series details with all seasons and episodes
+        """
+        series_details = await self.tmdb.get_series_details(id)
+        seasons = []
+        for season in range(1, series_details["number_of_seasons"] + 1):
+            season_details = await self.tmdb.get_season_details(id, season)
+            seasons.append(season_details)
+
+        series_details["seasons"] = seasons
+        return series_details
+
     async def update_db(self):
         """
         syncs the database with files on computer

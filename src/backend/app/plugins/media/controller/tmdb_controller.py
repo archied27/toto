@@ -112,9 +112,9 @@ class TMDBApiController:
             return None
 
         return {"title": data["name"], "poster_path": data["poster_path"],
-        "logo_path": logo_path, "id": id}
+        "logo_path": logo_path, "id": id, "backdrop_path": data["backdrop_path"], "number_of_seasons": data["number_of_seasons"]}
 
-    async def get_season_details(self, series_id: int, season_num: int):
+    async def get_season_details(self, series_id: int, season_num: int = 1):
         """
         fetches and returns season details
         """
@@ -136,7 +136,7 @@ class TMDBApiController:
         for episode in data["episodes"]:
             episodes.append({"episode_num": episode["episode_number"], "title": episode["name"],
             "description": episode["overview"], "still_path": episode["still_path"]})
-        return ({"title": data["name"], "air_date": data["air_date"], "poster_path": data["poster_path"]}, episodes)
+        return ({"title": data["name"], "air_date": data["air_date"], "poster_path": data["poster_path"], "episodes": episodes})
 
     async def get_movie_release_details(self, id: int):
         """

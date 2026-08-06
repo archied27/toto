@@ -1,16 +1,28 @@
 import { useState } from "react";
 import type { HomePageResult } from "../useMedia";
 import { MovieDetails } from "./MovieDetails";
+import { SeriesDetails } from "./SeriesDetails";
 
 export function SearchResults({ results, setSearchVisible }: { results: HomePageResult[]; setSearchVisible: (visible: boolean) => void }) {
     const [mediaSelected, setMediaSelected] = useState<number | null>(null);
+    const [mediaSelectedType, setMediaSelectedType] = useState<"movie" | "show" | null>(null);
 
     if (mediaSelected !== null) {
-        return <MovieDetails movieId={mediaSelected} 
-                close={() => {
-                    setMediaSelected(null)
-                    setSearchVisible(true)
-                }} />;
+        if (mediaSelectedType === "movie") {
+            return <MovieDetails movieId={mediaSelected} 
+                    close={() => {
+                        setMediaSelected(null)
+                        setSearchVisible(true)
+                    }} />;
+        }
+
+        if (mediaSelectedType === "show") {
+            return <SeriesDetails seriesId={mediaSelected} 
+                    close={() => {
+                        setMediaSelected(null)
+                        setSearchVisible(true)
+                    }} />;
+        }
     }
 
     return (
@@ -21,6 +33,7 @@ export function SearchResults({ results, setSearchVisible }: { results: HomePage
                 return (
                     <div key={result.id} className="flex flex-col items-center" 
                         onClick={() => {
+                            setMediaSelectedType(result.media_type);
                             setMediaSelected(result.id)
                             setSearchVisible(false);
                         }}>

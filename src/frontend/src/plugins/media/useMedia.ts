@@ -5,7 +5,7 @@ export interface HomePageResult {
     id: number;
     title: string;
     poster_path: string;
-    media_type: string;
+    media_type: "movie" | "show";
     release_date: string;
     release_type: number;
 }
@@ -19,6 +19,39 @@ export interface MovieDetails {
     logo_path: string;
     duration_seconds: number;
     release_type: number;
+}
+
+export interface SeriesDetails {
+    title: string;
+    poster_path: string;
+    logo_path: string;
+    backdrop_path: string;
+    id: number;
+    number_of_seasons: number;
+}
+
+export interface EpisodeDetails {
+    episode_num: number;
+    title: string;
+    description: string;
+    still_path: string;
+}
+
+export interface SeasonDetails {
+    title: string;
+    air_date: string;
+    poster_path: string;
+    episodes: EpisodeDetails[];
+}
+
+export interface FullSeriesDetails {
+    title: string;
+    poster_path: string;
+    logo_path: string;
+    backdrop_path: string;
+    id: number;
+    number_of_seasons: number;
+    seasons: SeasonDetails[];
 }
 
 export function useSearch() {
@@ -51,7 +84,6 @@ export function useGetMovieDetails(movieId: number) {
             const data = await apiFetch(`/mpv/movie_details/${movieId}`, {
                 method: "GET",
             });
-            console.log("Fetched movie details:", data);
             return data ? (data as MovieDetails) : null;
         } catch (error) {
             console.error("Failed to fetch movie details", error);
@@ -62,4 +94,26 @@ export function useGetMovieDetails(movieId: number) {
     }, [movieId]);
 
     return { getMovieDetails, loading };
+}
+
+export function useGetSeriesDetails(seriesId: number) {
+    const [loading, setLoading] = useState(false);
+
+    const getSeriesDetails = useCallback(async (): Promise<FullSeriesDetails | null> => {
+        setLoading(true);
+        try {
+            const data = await apiFetch(`/mpv/full_series_details/${seriesId}`, {
+                method: "GET",
+            });
+            console.log("Fetched series details:", data);
+            return data ? (data as FullSeriesDetails) : null;
+        } catch (error) {
+            console.error("Failed to fetch series details", error);
+            return null;
+        } finally {
+            setLoading(false);
+        }
+    }, [seriesId]);
+
+    return { getSeriesDetails, loading };
 }

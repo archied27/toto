@@ -17,6 +17,7 @@ class MPVRouter:
         self.router.add_api_route("/search", self.search_tmdb, methods=["GET"])
         self.router.add_api_route("/movie_details/{id}", self.get_movie_details, methods=["GET"])
         self.router.add_api_route("/series_details/{id}", self.get_series_details, methods=["GET"])
+        self.router.add_api_route("/full_series_details/{id}", self.get_full_series_details, methods=["GET"])
 
     def play(self, file: str, duration: int):
         return self.controller.play(file, duration)
@@ -38,3 +39,6 @@ class MPVRouter:
 
     async def get_series_details(self, id: int):
         return await self.controller.get_series_details(id)
+
+    async def get_full_series_details(self, id: int):
+        return await self.controller.get_full_series_details(id)
