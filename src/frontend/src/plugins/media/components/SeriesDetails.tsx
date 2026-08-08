@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useGetSeriesDetails, type FullSeriesDetails, type SeasonDetails } from "../useMedia";
-import { useDominantColor } from "../utils";
+import { isEpisodeAvailable, formatDuration, useDominantColor } from "../utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Cast, ChevronDown, Download, Play, X } from "lucide-react";
@@ -160,11 +160,11 @@ export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: (
                     <p className="flex-1 text-lg font-semibold mb-3 text-center">Episodes <span className="text-sm text-muted-foreground">({selectedSeason?.episodes.length})</span> </p>
                     {selectedSeason && selectedSeason.episodes.map((episode) => {
                         const still_path = episode.still_path ? `https://image.tmdb.org/t/p/w500${episode.still_path}` : undefined;
-
+                        const available = isEpisodeAvailable(episode.air_date);
                         
                         return (
                             <Card
-                                className="overflow-hidden mb-3 rounded-xl border border-white/10 bg-white/[0.04] p-0"
+                                className={`overflow-hidden mb-3 rounded-xl border border-white/10 bg-white/[0.04] p-0 ${!available ? "opacity-50" : ""}`}
                                 style={{
                                     background: dominantColor
                                         ? `linear-gradient(160deg, ${dominantColor}40, rgba(255,255,255,0.03) 70%)`
@@ -179,9 +179,16 @@ export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: (
                                     />
 
                                     <div className="flex min-w-0 flex-1 flex-col justify-center px-4">
-                                        <h3 className="truncate text-sm font-semibold text-white">
-                                            {episode.title}
-                                        </h3>
+                                        <div className="flex items-center justify-between gap-2">
+                                            <h3 className="truncate text-sm font-semibold text-white">
+                                                {episode.title}
+                                            </h3>
+                                            {episode.duration_seconds && (
+                                                <span className="shrink-0 text-xs text-muted-foreground ml-auto">
+                                                    {formatDuration(episode.duration_seconds)}
+                                                </span>
+                                            )}
+                                        </div>
 
                                         <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
                                             {episode.description}

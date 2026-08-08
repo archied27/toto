@@ -3,18 +3,27 @@ import { Loader2Icon, SearchIcon, XIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 export function SearchBox({
+    query: externalQuery,
     onSearch,
     onClose,
     loading,
 }: {
+    query: string;
     onSearch: (query: string) => void;
     onClose: () => void;
     loading: boolean;
 }) {
-    const [query, setQuery] = useState("");
-    const [searchOpen, setSearchOpen] = useState(false);
+    const [query, setQuery] = useState(externalQuery);
+    const [searchOpen, setSearchOpen] = useState(externalQuery.length > 0);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        setQuery(externalQuery);
+        if (externalQuery.length > 0) {
+            setSearchOpen(true);
+        }
+    }, [externalQuery]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newQuery = e.target.value;

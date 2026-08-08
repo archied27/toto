@@ -136,4 +136,26 @@ function getReleaseTypeDescription(releaseType: number, releaseDate?: string): s
     }
 }
 
+export function isEpisodeAvailable(airDate: string | undefined): boolean {
+    if (!airDate) return false;
+
+    const air = new Date(airDate);
+    const now = new Date();
+
+    return air <= now;
+}
+
+export function formatDuration(seconds: number | undefined): string {
+    if (!seconds) return "";
+
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+
+    if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+    }
+
+    return `${minutes}m`;
+}
+
 export { getReleaseTypeDescription };
