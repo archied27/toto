@@ -23,7 +23,7 @@ export function MovieDetails({ movieId, close }: { movieId: number; close?: () =
         ? `https://image.tmdb.org/t/p/w200${movieDetails.poster_path}`
         : undefined;
     const dominantColor = useDominantColor(posterUrl);
-    const release_type = getReleaseTypeDescription(movieDetails?.release_type || 6);
+    const release_type = getReleaseTypeDescription(movieDetails?.release_type || 6, movieDetails?.release_date);
 
     if (loading) {
         return <Skeleton className="w-full h-64" />;

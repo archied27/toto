@@ -109,7 +109,22 @@ export function useDominantColor(imageUrl: string | undefined) {
     return color;
 }
 
-function getReleaseTypeDescription(releaseType: number): string {
+function getReleaseTypeDescription(releaseType: number, releaseDate?: string): string {
+    if (releaseDate) {
+        const release = new Date(releaseDate);
+        const now = new Date();
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+        if (release > now) {
+            return "Not Released";
+        }
+
+        if (release < sixMonthsAgo) {
+            return "Released";
+        }
+    }
+
     switch (releaseType) {
         case 1: return "Premiered";
         case 2: return "Currently In Theaters";

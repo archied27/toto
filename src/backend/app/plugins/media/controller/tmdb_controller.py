@@ -135,7 +135,7 @@ class TMDBApiController:
         episodes = []
         for episode in data["episodes"]:
             episodes.append({"episode_num": episode["episode_number"], "title": episode["name"],
-            "description": episode["overview"], "still_path": episode["still_path"]})
+            "description": episode["overview"], "still_path": episode["still_path"], "air_date": episode["air_date"], "duration_seconds": episode["runtime"]*60 if episode["runtime"] else None})
         return ({"title": data["name"], "air_date": data["air_date"], "poster_path": data["poster_path"], "episodes": episodes})
 
     async def get_movie_release_details(self, id: int):

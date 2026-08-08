@@ -160,6 +160,7 @@ export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: (
                     <p className="flex-1 text-lg font-semibold mb-3 text-center">Episodes <span className="text-sm text-muted-foreground">({selectedSeason?.episodes.length})</span> </p>
                     {selectedSeason && selectedSeason.episodes.map((episode) => {
                         const still_path = episode.still_path ? `https://image.tmdb.org/t/p/w500${episode.still_path}` : undefined;
+
                         
                         return (
                             <Card

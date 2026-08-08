@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { HomePageResult } from "../useMedia";
 import { MovieDetails } from "./MovieDetails";
 import { SeriesDetails } from "./SeriesDetails";
+import { getReleaseTypeDescription } from "../utils";
 
 export function SearchResults({ results, setSearchVisible }: { results: HomePageResult[]; setSearchVisible: (visible: boolean) => void }) {
     const [mediaSelected, setMediaSelected] = useState<number | null>(null);
@@ -28,10 +29,11 @@ export function SearchResults({ results, setSearchVisible }: { results: HomePage
     return (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 px-2">
             {results.map((result) => {
-                const available = result.release_type > 3;
+                const releaseStatus = getReleaseTypeDescription(result.release_type, result.release_date);
+                const available = releaseStatus !== "Not Released" || "Premiered" || "Currently In Theaters";
 
                 return (
-                    <div key={result.id} className="flex flex-col items-center" 
+                    <div key={result.id} className="flex flex-col items-center"
                         onClick={() => {
                             setMediaSelectedType(result.media_type);
                             setMediaSelected(result.id)
@@ -53,7 +55,7 @@ export function SearchResults({ results, setSearchVisible }: { results: HomePage
                         <div className={`text-center ${available ? "" : "opacity-50"}`}>
                             <h3 className="text-sm font-bold text-center mt-2">{result.title}</h3>
                             <p className="text-[0.725rem] font-bold text-muted-foreground">
-                                <span className="capitalize">{result.media_type}</span> | {result.release_date?.slice(0, 4)} {available ? "" : "| Unavailable"}
+                                <span className="capitalize">{result.media_type}</span> | {result.release_date?.slice(0, 4)}
                             </p>
                         </div>
                     </div>

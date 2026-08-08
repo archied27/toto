@@ -35,6 +35,8 @@ export interface EpisodeDetails {
     title: string;
     description: string;
     still_path: string;
+    air_date: string;
+    duration_seconds: number;
 }
 
 export interface SeasonDetails {
