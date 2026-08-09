@@ -44,9 +44,6 @@ class WeatherController:
             ))
             self.core.bus.emit_no_wait("weather.updated", asdict(self.core.state.get("weather")))
 
-        else:
-            print("Error fetching data")
-
     async def load_state(self) -> None:
         """
         loads state from core state

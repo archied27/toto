@@ -20,7 +20,6 @@ class CommandRouter:
 
     def register_plugin(self, plugin: BaseCommand) -> None:
         if not isinstance(plugin, BaseCommand):
-            print(f"Plugin {plugin} is not a subclass of BaseCommand")
             return
         self.plugins.append(plugin)
         self._built = False

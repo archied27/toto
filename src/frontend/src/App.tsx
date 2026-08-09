@@ -65,7 +65,7 @@ function AppContent() {
 function App() {
   return (
     <div className="dark h-screen bg-background pt-[env(safe-area-inset-top)]">
-      <WebSocketProvider url={`wss://${window.location.host}${import.meta.env.VITE_WS_URL}`}>
+      <WebSocketProvider url={`wss://${window.location.host}/ws`}>
         <AppContent />
       </WebSocketProvider>
     </div>

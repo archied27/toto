@@ -20,7 +20,6 @@ class MPVController:
 
     async def update_state(self):
         new_state = MPVState()
-        print("updating mpv state" + str(new_state))
         await self.core.state.set("media", new_state)
         self.core.bus.emit_no_wait("pages.rerank")
 
@@ -146,7 +145,6 @@ class MPVController:
             if not os.path.isfile(episode["file_path"]):
                 await self.db.delete_episode(episode["id"])
                 # if season has no episodes
-                print(await self.db.get_seasons_episodes(episode["season_id"]))
                 # if len(await self.db.get_seasons_episodes(episode["season_id"])) == 0:
                 #     await self.db.delete_season(episode["season_id"])
                 #     # if series has no seasons
@@ -181,8 +179,6 @@ class MPVController:
 
                             count+=1
                             await task.update((count/total_files)*100, f"Found {data["title"]}")
-
-                            print(f"{round((count/total_files)*100)} %, Found {data["title"]}")
                         else:
                             count+=1
                             
@@ -208,7 +204,6 @@ class MPVController:
                         count+=1
 
                         await task.update((count/total_series)*100, f"Found {current_series["title"]}")
-                        print(f"{round((count/total_series)*100)} %, Found {current_series["title"]}")
 
                         series.append(current_series)
         

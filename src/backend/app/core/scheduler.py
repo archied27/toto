@@ -62,7 +62,7 @@ class Scheduler:
         """
         removes job from scheduler with id
         """
-        try:   
+        try:
             self.scheduler.remove_job(id)
         except JobLookupError:
-            print(f"Job {id} doesn't exist")
+            pass

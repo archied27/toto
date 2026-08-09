@@ -5,8 +5,8 @@ import { Button } from "./ui/button";
 import { CheckIcon, LoaderCircleIcon, XIcon } from "lucide-react";
 import { apiFetch } from "@/hooks/api";
 import { useState } from "react";
-import ReactMarkdown from "react-markdown";
 import "@fontsource-variable/geist";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 
 export default function CommandResultRenderer({
   result,
@@ -84,150 +84,7 @@ export default function CommandResultRenderer({
   if (result.action === "LLM_RESPONSE") {
     console.log(result.response);
     return <Card className="font-serif p-5 border-none shadow-none flex flex-col gap-2">
-      <ReactMarkdown
-        components={{
-          h1: ({ children }) => (
-            <h1 className="text-2xl font-semibold tracking-tight mt-5 mb-2">
-              {children}
-            </h1>
-          ),
-
-          h2: ({ children }) => (
-            <h2 className="text-xl font-semibold tracking-tight mt-5 mb-2">
-              {children}
-            </h2>
-          ),
-
-          h3: ({ children }) => (
-            <h3 className="text-lg font-semibold mt-4 mb-1.5">
-              {children}
-            </h3>
-          ),
-
-          h4: ({ children }) => (
-            <h4 className="text-base font-semibold mt-3 mb-1">
-              {children}
-            </h4>
-          ),
-
-          p: ({ children }) => (
-            <p className="leading-6 mb-2.5 text-foreground">
-              {children}
-            </p>
-          ),
-
-          strong: ({ children }) => (
-            <strong className="font-semibold">
-              {children}
-            </strong>
-          ),
-
-          em: ({ children }) => (
-            <em className="italic">
-              {children}
-            </em>
-          ),
-
-          ul: ({ children }) => (
-            <ul className="list-disc pl-5 space-y-1 mb-3">
-              {children}
-            </ul>
-          ),
-
-          ol: ({ children }) => (
-            <ol className="list-decimal pl-5 space-y-1 mb-3">
-              {children}
-            </ol>
-          ),
-
-          li: ({ children }) => (
-            <li className="leading-6">
-              {children}
-            </li>
-          ),
-
-          blockquote: ({ children }) => (
-            <blockquote className="border-l-2 border-muted-foreground/30 pl-3 italic text-muted-foreground my-3">
-              {children}
-            </blockquote>
-          ),
-
-          hr: () => (
-            <hr className="my-4 border-border" />
-          ),
-
-          a: ({ children, href }) => (
-            <a
-              href={href}
-              className="text-primary underline underline-offset-2 hover:opacity-80"
-              target="_blank"
-              rel="noreferrer"
-            >
-              {children}
-            </a>
-          ),
-
-          code: ({ children, className }) => {
-            const isBlock = className?.includes("language-");
-
-            if (isBlock) {
-              return (
-                <code className={className}>
-                  {children}
-                </code>
-              );
-            }
-
-            return (
-              <code className="rounded bg-muted px-1 py-0.5 text-sm font-mono">
-                {children}
-              </code>
-            );
-          },
-
-          pre: ({ children }) => (
-            <pre className="bg-muted/50 border border-border rounded-lg p-3 overflow-x-auto my-3 text-sm font-mono leading-5">
-              {children}
-            </pre>
-          ),
-
-          table: ({ children }) => (
-            <div className="overflow-x-auto my-3">
-              <table className="w-full border-collapse text-sm">
-                {children}
-              </table>
-            </div>
-          ),
-
-          thead: ({ children }) => (
-            <thead className="border-b border-border">
-              {children}
-            </thead>
-          ),
-
-          th: ({ children }) => (
-            <th className="text-left font-medium px-2 py-1.5">
-              {children}
-            </th>
-          ),
-
-          td: ({ children }) => (
-            <td className="border-b border-border px-2 py-1.5">
-              {children}
-            </td>
-          ),
-
-          img: ({ src, alt }) => (
-            <img
-              src={src}
-              alt={alt}
-              className="rounded-lg max-w-full my-3"
-            />
-          ),
-        }}
-      >
-        {result.response}
-      </ReactMarkdown>
+      <MarkdownRenderer content={result.response} />
     </Card>
   }
 

@@ -42,8 +42,7 @@ class WeatherAPI:
             pollen_data = await self.get_pollen_details()
             return self.parse_response(data, pollen_data)
 
-        except Exception as e:
-            print(f"Weather API Error: {e}")
+        except Exception:
             return None
 
     @staticmethod
@@ -116,6 +115,5 @@ class WeatherAPI:
 
             return data
 
-        except Exception as e:
-            print(f"Weather API Error: {e}")
+        except Exception:
             return None

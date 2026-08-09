@@ -38,7 +38,6 @@ class DashboardService:
         # slots have changed
         if new_state.slots != self.dashboard_state.slots:
             self.dashboard_state = new_state
-            print(f"Dashboard slots updated: {new_state.slots}")
             await self.core.state.set("dashboard", new_state)
             await self.core.bus.emit("dashboard.changed", new_state.slots)
         

@@ -1,6 +1,7 @@
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from app.schemas.base_command import BaseCommand, MatchResult
+from typing import Optional
 
 class IntentSimilarityModel:
     def __init__(self,):

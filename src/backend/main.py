@@ -31,7 +31,10 @@ async def lifespan(app: FastAPI):
     scheduler = Scheduler(event_bus)
     bg_worker = BackgroundWorker(event_bus)
     ws_manager = WebSocketManager(event_bus)
-    db_manager = DBManager("app/db/toto.db")
+    # database lives in the project's data/ folder (src/data when running the
+    # backend from src/backend); docker-compose overrides this to /app/data
+    db_path = os.getenv("TOTO_DB_PATH", "../data/toto.db")
+    db_manager = DBManager(db_path)
     core = Core(event_bus, bg_worker, scheduler, db_manager, state)
 
     await ws_manager.forward("dashboard.changed")
@@ -133,7 +136,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 if event_type:
                     await app.state.core.bus.emit(event_type, event_data)
             except json.JSONDecodeError:
-                print("Invalid JSON received on WebSocket")
+                pass
     except WebSocketDisconnect:
         await app.state.ws_manager.disconnect(websocket)
 

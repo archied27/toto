@@ -26,9 +26,6 @@ class WebSocketManager:
         """
         removes websocket from connections
         """
-        print("\n\n\n\n\n\n\n\n\n")
-        print(f"Disconnecting websocket: {websocket.client}")
-        print("\n\n\n\n\n\n\n\n\n")
         async with self.lock:
             if websocket in self.connections:
                 self.connections.remove(websocket)
@@ -55,9 +52,7 @@ class WebSocketManager:
         for ws in connections:
             try:
                 await ws.send_text(json.dumps(message))
-                print(f"\n\nMessage sent {message}")
-            except Exception as e:
-                print(f"send failed: {e}")
+            except Exception:
                 dead.append(ws)
 
         for ws in dead:

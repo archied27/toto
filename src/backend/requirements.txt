@@ -1,1 +1,11 @@
-fastapi, uvicorn[standard], python-dotenv, apscheduler, aiosqlite, aiohttp, sentence-transformers, scikit-learn, llama-cpp-python, dateparser, groq
+fastapi
+uvicorn[standard]
+python-dotenv
+apscheduler
+aiosqlite
+aiohttp
+sentence-transformers
+scikit-learn
+llama-cpp-python
+dateparser
+groq

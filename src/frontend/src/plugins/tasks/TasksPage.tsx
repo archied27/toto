@@ -10,6 +10,18 @@ import TaskFilter from "./components/TaskFilter";
 import ActiveFilters from "./components/ActiveFilters";
 import { useNavigation } from "@/hooks/NavigationContext";
 
+// Orders tasks by the date they should be worked on: to_do_date first, falling
+// back to due_date when there's no to-do date. Undated tasks go last.
+function sortByDate(a: Task, b: Task): number {
+    const dateOf = (task: Task) => {
+        const iso = task.to_do_date ?? task.due_date;
+        if (!iso) return Number.MAX_SAFE_INTEGER;
+        const time = parseISO(iso).getTime();
+        return Number.isNaN(time) ? Number.MAX_SAFE_INTEGER : time;
+    };
+    return dateOf(a) - dateOf(b);
+}
+
 export default function TasksPage() {
     const { taskState, getTasks } = useTaskState();
     const { tasks: allTasks, refetch: getAllTasks } = useGetAllTasks();
@@ -147,13 +159,13 @@ export default function TasksPage() {
             case "All":
                 // Determine which tasks to show based on filters
                 if (selectedLabelId !== null) {
-                    setCurrentTasks(labelFilteredTasks);
+                    setCurrentTasks([...labelFilteredTasks].sort(sortByDate));
                     setCurrentRefresh(() => getLabelTasks);
                 } else if (selectedListId !== null) {
-                    setCurrentTasks(listFilteredTasks);
+                    setCurrentTasks([...listFilteredTasks].sort(sortByDate));
                     setCurrentRefresh(() => getListTasks);
                 } else {
-                    setCurrentTasks(allTasks);
+                    setCurrentTasks([...allTasks].sort(sortByDate));
                     setCurrentRefresh(() => getAllTasks);
                 }
                 break;

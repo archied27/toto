@@ -4,8 +4,9 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import fs from 'fs';
 import path from 'path';
+
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
     resolve: {
         alias: {
             "@": path.resolve(__dirname, "./src")
@@ -26,22 +27,9 @@ export default defineConfig({
                 display: 'standalone',
                 start_url: '/',
                 icons: [
-                    {
-                        src: 'icons/icon-192.png',
-                        sizes: '192x192',
-                        type: 'image/png'
-                    },
-                    {
-                        src: 'icons/icon-512.png',
-                        sizes: '512x512',
-                        type: 'image/png'
-                    },
-                    {
-                        src: 'icons/icon-512.png',
-                        sizes: '512x512',
-                        type: 'image/png',
-                        purpose: 'any maskable'
-                    }
+                    { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+                    { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+                    { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
                 ]
             },
             workbox: {
@@ -55,7 +43,7 @@ export default defineConfig({
             }
         })
     ],
-    server: {
+    server: command === 'serve' ? {
         https: {
             key: fs.readFileSync('../certs/archlinux.tail802449.ts.net.key'),
             cert: fs.readFileSync('../certs/archlinux.tail802449.ts.net.crt'),
@@ -69,5 +57,5 @@ export default defineConfig({
         watch: {
             ignored: ['**/.env', '**/certs/**', path.resolve(__dirname, '../certs/**'),]
         }
-    }
-});
+    } : {}
+}));

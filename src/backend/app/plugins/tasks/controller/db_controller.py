@@ -80,11 +80,10 @@ class TasksDBController:
     # -------------------------------------------------------------------------
 
     async def add_list(self, task_list: CreateTaskList):
-        last_id = await self.core.db_manager.execute(
+        await self.core.db_manager.execute(
             "INSERT INTO tasks_list (name, colour) VALUES (?, ?)",
             (task_list.name, task_list.colour)
         )
-        print(f"Added task list with ID: {last_id}")
 
     async def get_lists(self) -> list[TaskList]:
         rows = await self.core.db_manager.fetch_all(

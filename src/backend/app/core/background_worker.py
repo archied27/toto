@@ -2,6 +2,7 @@
 worker to run long tasks in the background
 """
 
+from __future__ import annotations
 from asyncio.queues import Queue
 import asyncio
 from typing import Callable, Any
@@ -86,7 +87,6 @@ class BackgroundWorker:
         except Exception as e:
             task.status = "failed"
             task.error = str(e)
-            print(f"ERROR: {e}")
             await self.event_bus.emit("task.failed", task)
 
 class Task:

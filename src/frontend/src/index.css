@@ -239,3 +239,40 @@
 .animate-task-leave {
   animation: task-leave 0.25s ease-in forwards;
 }
+
+/* Markdown code fence syntax highlighting (rehype-highlight token classes).
+   Tuned for the dark CodeBlock background in MarkdownRenderer. */
+.hljs-comment,
+.hljs-quote,
+.hljs-meta { color: #8b949e; font-style: italic; }
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-subst,
+.hljs-section,
+.hljs-deletion { color: #ff7b72; }
+.hljs-number,
+.hljs-literal,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-property,
+.hljs-attr,
+.hljs-attribute { color: #79c0ff; }
+.hljs-string,
+.hljs-doctag,
+.hljs-regexp,
+.hljs-link,
+.hljs-addition { color: #a5d6ff; }
+.hljs-title,
+.hljs-title.function_,
+.hljs-built_in,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-selector-id,
+.hljs-selector-class { color: #d2a8ff; }
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-tag,
+.hljs-name { color: #ffa657; }
+.hljs-params { color: #c9d1d9; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 700; }
