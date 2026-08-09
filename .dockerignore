@@ -1,0 +1,12 @@
+**/node_modules
+**/__pycache__
+**/*.pyc
+.git
+src/backend/.env
+!src/frontend/.env
+src/frontend/build
+src/frontend/dist
+src/backend/venv
+data/
+*.db
+certs/
