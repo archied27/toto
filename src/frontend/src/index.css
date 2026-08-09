@@ -216,3 +216,18 @@
 .animate-fade-slide-in {
   animation: fade-slide-in 0.5s ease both;
 }
+
+@keyframes task-complete-sweep {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+.animate-task-complete-sweep {
+  transform-origin: left;
+  animation: task-complete-sweep 0.6s ease-in-out forwards;
+}
+
+.animate-task-complete-sweep-reverse {
+  transform-origin: left;
+  animation: task-complete-sweep 0.6s ease-in-out reverse forwards;
+}

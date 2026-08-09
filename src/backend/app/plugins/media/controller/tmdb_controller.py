@@ -10,34 +10,40 @@ class TMDBApiController:
         self.api_key = api_key
         self.base_url = 'https://api.themoviedb.org/3'
 
-    async def search_tmdb(self, query: str, page: int = 1):
+    async def search_tmdb(self, query: str, media_type: str = "all", page: int = 1):
         """
-        searches tmdb for movies and series matching the query
+        searches tmdb for movies and/or series matching the query
+        media_type can be "all", "movie" or "tv"
         """
-        data = None
+        endpoint = "search/movie" if media_type == "movie" else "search/tv" if media_type == "tv" else "search/multi"
 
-        url = f"{self.base_url}/search/multi"
+        url = f"{self.base_url}/{endpoint}"
         params = {"api_key": self.api_key, "query": query, "page": page}
+
+        data = None
 
         async with aiohttp.ClientSession() as session:
             async with session.get(url, params=params) as response:
                 response.raise_for_status()
                 if response.status == 200:
                     data = await response.json()
-        
+
         if data == None:
             return None
 
         results = []
         for result in data["results"]:
-            if result["media_type"] == "movie":
+            # /search/multi includes a media_type field; the type-specific endpoints imply it
+            result_type = result.get("media_type") or endpoint.replace("search/", "")
+
+            if result_type == "movie":
                 release_type = await self.get_movie_release_details(result["id"])
 
                 results.append({"id": result["id"], "title": result["title"], "poster_path": result["poster_path"],
                 "media_type": "movie", "release_date": result["release_date"], "release_type": release_type})
 
 
-            elif result["media_type"] == "tv":
+            elif result_type == "tv":
                 results.append({"id": result["id"], "title": result["name"], "poster_path": result["poster_path"],
                 "media_type": "show", "release_date": result["first_air_date"], "release_type": 6})
         return results

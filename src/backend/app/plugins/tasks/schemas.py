@@ -34,6 +34,8 @@ class Task(BaseModel):
     due_date: Optional[str] = None
     to_do_date: Optional[str] = None
     completed: bool = False
+    date_created: Optional[str] = None
+    date_completed: Optional[str] = None
     labels: list[Label] = Field(default_factory=list)
     task_list: Optional[TaskList] = None
 

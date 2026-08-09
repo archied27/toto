@@ -39,11 +39,11 @@ class MPVController:
         await self.db.initialise_db()
         await self.update_state()
 
-    async def search_tmdb(self, query: str):
+    async def search_tmdb(self, query: str, media_type: str = "all"):
         """
-        searches tmdb for movies and series matching the query
+        searches tmdb for movies and/or series matching the query
         """
-        return await self.tmdb.search_tmdb(query)
+        return await self.tmdb.search_tmdb(query, media_type)
 
     async def get_movie_details(self, id: int):
         """

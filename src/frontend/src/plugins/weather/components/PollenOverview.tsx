@@ -8,8 +8,12 @@ export default function PollenOverview({ pollen }: { pollen: number | undefined 
     const { navigate } = useNavigation();
 
     return (
-        <Card className="border-none shadow-none" onClick={() => (navigate("weather", {scrollTo: "pollen"}))}>
-            <CardContent className="px-5 py-4">
+        <Card className="border-none shadow-none relative overflow-hidden flex-1 min-w-0" onClick={() => (navigate("weather", {scrollTo: "pollen"}))}>
+            <div
+                className="pointer-events-none absolute inset-0 blur-3xl opacity-25"
+                style={{ background: pollen ? `radial-gradient(ellipse 100% 100% at 50% 0%, ${pollenColour(pollen)}, transparent 90%)` : 'transparent' }}
+            />
+            <CardContent className="px-5 py-4 relative">
                 <div className="flex items-center gap-1.5 mb-2.5">
                     <LeafIcon width={16} height={16} color="green" />
                     <CardTitle className="text-xs text-muted-foreground font-medium tracking-wide">

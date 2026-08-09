@@ -20,6 +20,7 @@ class TasksRouter:
         self.router.add_api_route("/add_label", self.add_label, methods=["POST"])
         self.router.add_api_route("/get_labels", self.get_labels, methods=["GET"])
         self.router.add_api_route("/get_label_tasks/{label_id}", self.get_label_tasks, methods=["GET"])
+        self.router.add_api_route("/get_list_tasks/{list_id}", self.get_list_tasks, methods=["GET"])
         self.router.add_api_route("/add_list", self.add_list, methods=["POST"])
         self.router.add_api_route("/get_list/{list_id}", self.get_list, methods=["GET"])
         self.router.add_api_route("/get_lists", self.get_lists, methods=["GET"])
@@ -73,6 +74,10 @@ class TasksRouter:
     
     async def get_label_tasks(self, label_id: str):
         tasks = await self.controller.get_label_tasks(label_id)
+        return tasks
+
+    async def get_list_tasks(self, list_id: str):
+        tasks = await self.controller.get_list_tasks(list_id)
         return tasks
 
     async def get_lists(self):

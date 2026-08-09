@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import AddLabelList from "./AddLabelList";
 import LabelListButton from "./LabelListButton";
+import ActiveFilters from "./ActiveFilters";
 import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -21,6 +22,9 @@ export default function AddTask({ onClose }: { onClose?: () => void }) {
     const [toDoDate, setToDoDate] = useState<string | null>(null);
     const [selectedList, setSelectedList] = useState<number | null>(null);
     const [selectedLabels, setSelectedLabels] = useState<number[]>([]);
+
+    const selectedListObject = lists.taskLists.find(list => list.id === selectedList) ?? null;
+    const selectedLabelObjects = labels.taskLabels.filter(label => selectedLabels.includes(label.id));
 
     const onSubmit = async () => {
         if (!name.trim()) return;
@@ -84,6 +88,13 @@ export default function AddTask({ onClose }: { onClose?: () => void }) {
                         </PopoverContent>
                     </Popover>
                 </div>
+
+                <ActiveFilters
+                    labels={selectedLabelObjects}
+                    lists={selectedListObject ? [selectedListObject] : []}
+                    onLabelRemove={(id) => setSelectedLabels(prev => prev.filter(x => x !== id))}
+                    onListRemove={() => setSelectedList(null)}
+                />
             </div>
         </Card>
     );

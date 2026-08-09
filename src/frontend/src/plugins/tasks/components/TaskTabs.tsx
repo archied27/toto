@@ -6,7 +6,7 @@ interface TaskTabsProps {
 }
 
 export default function TaskTabs({ currentTab, onTabChange }: TaskTabsProps) {
-  const tabs = ["Today", "Tomorrow", "Upcoming", "All"] as const;
+  const tabs = ["All", "Today", "Tomorrow", "Upcoming"] as const;
   const containerRef = useRef<HTMLDivElement>(null);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
 

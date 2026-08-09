@@ -32,6 +32,8 @@ class TasksDBController:
                 due_date TEXT,
                 to_do_date TEXT,
                 completed BOOLEAN,
+                date_created TEXT,
+                date_completed TEXT,
                 list_id INTEGER
             );
 
@@ -145,17 +147,22 @@ class TasksDBController:
             due_date=row["due_date"],
             to_do_date=row["to_do_date"],
             completed=row["completed"],
+            date_created=row["date_created"],
+            date_completed=row["date_completed"],
             labels=labels,
             task_list=task_list
         )
 
     async def add_task(self, task: CreateTask):
+        from datetime import datetime, timezone
+        date_created = datetime.now(timezone.utc).isoformat()
+
         last_id = await self.core.db_manager.execute(
             """
-            INSERT INTO tasks_tasks (title, description, due_date, to_do_date, completed, list_id)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO tasks_tasks (title, description, due_date, to_do_date, completed, date_created, date_completed, list_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (task.title, task.description, task.due_date, task.to_do_date, False, task.list_id)
+            (task.title, task.description, task.due_date, task.to_do_date, False, date_created, None, task.list_id)
         )
         if task.label_ids:
             for label_id in task.label_ids:
@@ -194,6 +201,19 @@ class TasksDBController:
             WHERE tl.label_id = ?
             """,
             (label_id,)
+        )
+        tasks = []
+        for row in rows:
+            task_id = row["id"]
+            labels = await self._fetch_labels_for_task(task_id)
+            task_list = await self._fetch_list_for_task(row["list_id"]) if row["list_id"] else None
+            tasks.append(self._build_task(row, labels, task_list))
+        return tasks
+
+    async def get_list_tasks(self, list_id: int) -> list[Task]:
+        rows = await self.core.db_manager.fetch_all(
+            "SELECT * FROM tasks_tasks WHERE list_id = ?",
+            (list_id,)
         )
         tasks = []
         for row in rows:
@@ -295,12 +315,17 @@ class TasksDBController:
         return tasks
 
     async def toggle_task_completion(self, task_id: int):
+        from datetime import datetime, timezone
+
         row = await self.core.db_manager.fetch_one(
             "SELECT completed FROM tasks_tasks WHERE id = ?", (task_id,)
         )
         if not row:
             return
         new_status = not row["completed"]
+        date_completed = datetime.now(timezone.utc).isoformat() if new_status else None
+
         await self.core.db_manager.execute(
-            "UPDATE tasks_tasks SET completed = ? WHERE id = ?", (new_status, task_id)
+            "UPDATE tasks_tasks SET completed = ?, date_completed = ? WHERE id = ?",
+            (new_status, date_completed, task_id)
         )

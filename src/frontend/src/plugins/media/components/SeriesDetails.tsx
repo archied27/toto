@@ -41,13 +41,13 @@ export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: (
         : null;
 
     return (
-        <div className="relative bg-black min-h-dvh overflow-hidden">
+        <div className="relative bg-black min-h-dvh overflow-hidden pb-25 mb-0">
             {/* Ambient color glow, derived from poster */}
             <div
-                className="pointer-events-none absolute inset-x-0 top-0 h-[85dvh] opacity-60 blur-3xl"
+                className="pointer-events-none absolute inset-x-0 top-0 h-[110dvh] opacity-60 blur-[100px]"
                 style={{
                     background: dominantColor
-                        ? `radial-gradient(ellipse 100% 100% at 50% 0%, ${dominantColor}, transparent 90%)`
+                        ? `radial-gradient(ellipse 100% 100% at 50% 0%, ${dominantColor}, transparent 100%)`
                         : undefined,
                 }}
             />

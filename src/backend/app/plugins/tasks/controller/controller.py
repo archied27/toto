@@ -116,6 +116,10 @@ class TasksController:
         # get all tasks that have a specific label
         return await self.db_controller.get_label_tasks(label_id)
 
+    async def get_list_tasks(self, list_id: str) -> list[Task]:
+        # get all tasks that belong to a specific list
+        return await self.db_controller.get_list_tasks(list_id)
+
     async def add_label(self, label: CreateLabel):
         # add a label to the database
         await self.db_controller.add_label(label)

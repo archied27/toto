@@ -43,10 +43,10 @@ export function MovieDetails({ movieId, close }: { movieId: number; close?: () =
         <div className="relative bg-black min-h-dvh overflow-hidden">
             {/* Ambient color glow, derived from poster */}
             <div
-                className="pointer-events-none absolute inset-x-0 top-0 h-[85dvh] opacity-60 blur-3xl"
+                className="pointer-events-none absolute inset-x-0 top-0 h-[110dvh] opacity-60 blur-[100px]"
                 style={{
                     background: dominantColor
-                        ? `radial-gradient(ellipse 100% 100% at 50% 0%, ${dominantColor}, transparent 90%)`
+                        ? `radial-gradient(ellipse 100% 100% at 50% 0%, ${dominantColor}, transparent 100%)`
                         : undefined,
                 }}
             />

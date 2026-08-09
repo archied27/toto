@@ -91,7 +91,7 @@ export default function TemperatureGraph({ dayHourlyWeather, currentWeather }: T
                         interval={3}
 
                     />
-                    <YAxis hide />
+                    <YAxis hide domain={[-10, 40]} />
                     <Tooltip content={<CustomTooltip />} trigger="click" active={tooltipActive}/>
                     </AreaChart>
                 </ResponsiveContainer>

@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import type { WeatherAtTime } from "../useWeather";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
+import { Bar, Line, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 interface PrecipitationGraphProps {
     dayHourlyWeather: WeatherAtTime[] | null;
@@ -11,12 +11,14 @@ interface PrecipitationGraphProps {
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     const time = new Date(label).toLocaleTimeString("en-GB", { "hour12": true, "hour": "numeric" })
+    const precipData = payload.find((p: any) => p.dataKey === "precip_mm");
+    const probData = payload.find((p: any) => p.dataKey === "precip_prob");
+
     return (
         <div className="bg-card border border-border rounded-md px-2 py-1 text-sm font-medium flex flex-col">
             <span className="text-muted-foreground">{time}</span>
-            <span className="text-muted-foreground">{payload[0].payload.precip_prob}% of
-                <span className="text-foreground font-bold"> {payload[0].value}mm</span>
-            </span>
+            <span className="text-foreground font-bold">{precipData?.value}mm</span>
+            <span className="text-muted-foreground">{probData?.value}% probability</span>
         </div>
     );
 };
@@ -49,7 +51,7 @@ export default function PrecipitationGraph({ dayHourlyWeather, currentWeather }:
             {dayHourlyWeather ?
                 <div ref={chartRef}>
                     <ResponsiveContainer width="100%" height={120}>
-                        <BarChart data={dayHourlyWeather} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}
+                        <ComposedChart data={dayHourlyWeather} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}
                             onClick={() => setTooltipActive(true)}>
                             <XAxis
                                 dataKey="time"
@@ -60,26 +62,49 @@ export default function PrecipitationGraph({ dayHourlyWeather, currentWeather }:
                                 tick={{ fontSize: 12 }}
                                 interval={3}
                             />
+                            <YAxis
+                                yAxisId="left"
+                                orientation="left"
+                                domain={[0, 3]}
+                                hide={true}
+                            />
+                            <YAxis
+                                yAxisId="right"
+                                orientation="right"
+                                domain={[0, 75]}
+                                hide={true}
+                            />
                             <Bar
-                                dataKey="precip_mm"
+                                yAxisId="right"
+                                dataKey="precip_prob"
                                 radius={8}
                                 cursor="default"
                                 activeBar={false}
                                 fill="#3b82f6"
+                                fillOpacity={0.2}
                                 shape={(props: any) => {
                                     const hour = dayHourlyWeather![props.index];
                                     const past = isPast(hour);
                                     return <rect
                                         {...props}
                                         fill={past ? "#6b7280" : "#3b82f6"}
-                                        fillOpacity={past ? 0.5 : 1}
+                                        fillOpacity={past ? 0.1 : 0.2}
                                         rx={8}
                                         ry={8}
                                     />;
                                 }}
                             />
+                            <Line
+                                yAxisId="left"
+                                type="monotone"
+                                dataKey="precip_mm"
+                                stroke="#3b82f6"
+                                strokeWidth={2}
+                                dot={false}
+                                activeDot={{ r: 4 }}
+                            />
                             <Tooltip content={<CustomTooltip />} trigger="click" active={tooltipActive} cursor={false} />
-                        </BarChart>
+                        </ComposedChart>
                     </ResponsiveContainer>
                 </div>
                 : <></>}

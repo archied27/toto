@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
+import { parseISO, subDays } from "date-fns";
 import Hero from "./components/Hero";
-import { useGetAllTasks, useGetTomorrowTasks, useGetUpcomingTasks, useTaskState, type Task } from "./useTasks";
+import { useGetAllTasks, useGetTomorrowTasks, useGetUpcomingTasks, useTaskState, useGetLabelTasks, useGetListTasks, useGetTaskLabels, useGetTaskLists, type Task } from "./useTasks";
 import TaskTabs from "./components/TaskTabs";
 import TaskList from "./components/TaskList";
+import TaskCard from "./components/TaskCard";
 import AddTask from "./components/AddTask";
+import TaskFilter from "./components/TaskFilter";
+import ActiveFilters from "./components/ActiveFilters";
 import { useNavigation } from "@/hooks/NavigationContext";
 
 export default function TasksPage() {
@@ -12,7 +16,15 @@ export default function TasksPage() {
     const { tasks: tomorrowTasks, refetch: getTomorrowTasks } = useGetTomorrowTasks();
     const { tasks: upcomingTasks, refetch: getUpcomingTasks } = useGetUpcomingTasks();
 
-    const [currentTab, setCurrentTab] = useState<"Today" | "Tomorrow" | "Upcoming" | "All">("Today");
+    const [selectedLabelId, setSelectedLabelId] = useState<number | null>(null);
+    const [selectedListId, setSelectedListId] = useState<number | null>(null);
+
+    const { tasks: labelFilteredTasks, refetch: getLabelTasks } = useGetLabelTasks(selectedLabelId);
+    const { tasks: listFilteredTasks, refetch: getListTasks } = useGetListTasks(selectedListId);
+    const { taskLabels } = useGetTaskLabels();
+    const { taskLists } = useGetTaskLists();
+
+    const [currentTab, setCurrentTab] = useState<"Today" | "Tomorrow" | "Upcoming" | "All">("All");
 
     const [currentTasks, setCurrentTasks] = useState<Task[]>(taskState?.today_tasks || []);
     const [currentRefresh, setCurrentRefresh] = useState<() => void>(() => () => {});
@@ -25,8 +37,17 @@ export default function TasksPage() {
     const overdueIds = overdueTasks.map(task => task.id);
     const dedupedTasks = currentTasks.filter(task => !overdueIds.includes(task.id));
 
-    const completedTasks = dedupedTasks.filter(task => task.completed);
+    const sevenDaysAgo = subDays(new Date(), 7);
+    const completedTasks = dedupedTasks.filter(task =>
+        task.completed && task.date_completed
+            ? parseISO(task.date_completed) >= sevenDaysAgo
+            : false
+    );
     const incompleteTasks = dedupedTasks.filter(task => !task.completed);
+
+    const activeLabel = taskLabels.find(label => label.id === selectedLabelId) ?? null;
+    const activeList = taskLists.find(list => list.id === selectedListId) ?? null;
+    const filtersActive = selectedLabelId !== null || selectedListId !== null;
 
     useEffect(() => {
         switch (currentTab) {
@@ -53,11 +74,20 @@ export default function TasksPage() {
                 setCurrentRefresh(() => getUpcomingTasks);
                 break;
             case "All":
-                setCurrentTasks(allTasks);
-                setCurrentRefresh(() => getAllTasks);
+                // Determine which tasks to show based on filters
+                if (selectedLabelId !== null) {
+                    setCurrentTasks(labelFilteredTasks);
+                    setCurrentRefresh(() => getLabelTasks);
+                } else if (selectedListId !== null) {
+                    setCurrentTasks(listFilteredTasks);
+                    setCurrentRefresh(() => getListTasks);
+                } else {
+                    setCurrentTasks(allTasks);
+                    setCurrentRefresh(() => getAllTasks);
+                }
                 break;
         }
-    }, [taskState, tomorrowTasks, upcomingTasks, allTasks, currentTab]);
+    }, [taskState, tomorrowTasks, upcomingTasks, allTasks, labelFilteredTasks, listFilteredTasks, selectedLabelId, selectedListId, currentTab]);
 
     const handleTabChange = (tab: "Today" | "Tomorrow" | "Upcoming" | "All") => {
         setCurrentTab(tab);
@@ -93,11 +123,67 @@ export default function TasksPage() {
                     <Hero selected={currentTab} total={dedupedTasks.length} completed={completedTasks.length} handleAddTask={() => setAddTaskPageOpen(true)} />
                     <TaskTabs currentTab={currentTab} onTabChange={handleTabChange} />
 
+                    {filtersActive && (
+                        <div className="flex items-center gap-2">
+                            <TaskFilter
+                                labels={taskLabels}
+                                lists={taskLists}
+                                selectedLabelId={selectedLabelId}
+                                selectedListId={selectedListId}
+                                onLabelSelect={setSelectedLabelId}
+                                onListSelect={setSelectedListId}
+                            />
+                            <ActiveFilters
+                                labels={activeLabel ? [activeLabel] : []}
+                                lists={activeList ? [activeList] : []}
+                                onLabelRemove={() => setSelectedLabelId(null)}
+                                onListRemove={() => setSelectedListId(null)}
+                            />
+                        </div>
+                    )}
+
                     {overdueTasks.length > 0 && (
-                        <TaskList tasks={overdueTasks} refresh={getAllTasks} title="Overdue Tasks" titleClassName="text-red-500" cardClassName="bg-red-500/25" />
+                        <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-lg font-semibold text-red-500">Overdue Tasks</h2>
+                                {!filtersActive && (taskLabels.length > 0 || taskLists.length > 0) && (
+                                    <TaskFilter
+                                        labels={taskLabels}
+                                        lists={taskLists}
+                                        selectedLabelId={selectedLabelId}
+                                        selectedListId={selectedListId}
+                                        onLabelSelect={setSelectedLabelId}
+                                        onListSelect={setSelectedListId}
+                                    />
+                                )}
+                            </div>
+                            {overdueTasks.map(task => (
+                                <TaskCard key={task.id} task={task} refresh={getAllTasks} className="bg-red-500/25" />
+                            ))}
+                        </div>
                     )}
                     {incompleteTasks.length > 0 && (
-                        <TaskList tasks={incompleteTasks} refresh={currentRefresh} title="To Do Tasks" />
+                        <div className="flex flex-col gap-2">
+                            {overdueTasks.length === 0 && (
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-lg font-semibold text-foreground">To Do Tasks</h2>
+                                    {!filtersActive && (taskLabels.length > 0 || taskLists.length > 0) && (
+                                        <TaskFilter
+                                            labels={taskLabels}
+                                            lists={taskLists}
+                                            selectedLabelId={selectedLabelId}
+                                            selectedListId={selectedListId}
+                                            onLabelSelect={setSelectedLabelId}
+                                            onListSelect={setSelectedListId}
+                                        />
+                                    )}
+                                </div>
+                            )}
+                            {overdueTasks.length > 0 && <h2 className="text-lg font-semibold text-foreground">To Do Tasks</h2>}
+                            {incompleteTasks.map(task => (
+                                <TaskCard key={task.id} task={task} refresh={currentRefresh} />
+                            ))}
+                        </div>
                     )}
                     {completedTasks.length > 0  && (
                         <TaskList tasks={completedTasks} refresh={currentRefresh} title="Completed Tasks" titleClassName="text-muted-foreground" cardClassName="opacity-50" />
@@ -105,7 +191,11 @@ export default function TasksPage() {
 
                     {dedupedTasks.length === 0 && (
                         <div className="flex flex-1 items-center justify-center">
-                            <p className="text-sm text-muted-foreground">All Tasks Completed</p>
+                            <p className="text-sm text-muted-foreground">
+                                {selectedLabelId !== null || selectedListId !== null
+                                    ? "No tasks match this filter"
+                                    : "All Tasks Completed"}
+                            </p>
                         </div>
                     )}
                 </div>

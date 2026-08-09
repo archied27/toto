@@ -17,12 +17,13 @@ function isToday(time: string | undefined | null): boolean {
 }
 
 export default function WeatherOverview({ day, current_weather, max_pollen }: { day: WeatherDaily | null | undefined, current_weather: WeatherAtTime | undefined, max_pollen: number }) {
+    const hasPollen = max_pollen > 0 || (isToday(day?.time) && current_weather?.grass_pollen !== undefined && current_weather?.grass_pollen > 0);
+
     return (
-        <Card className="grid grid-cols-3 gap-2 px-3">
+        <Card className="flex flex-row gap-2 px-3 justify-center">
             <PrecipitationOverview precip={day?.precip} />
             <UVOverview uv_max={isToday(day?.time) ? current_weather?.uv : day?.max_uv} />
-            <PollenOverview pollen={isToday(day?.time) ? current_weather?.grass_pollen : max_pollen} />
-
+            {hasPollen && <PollenOverview pollen={isToday(day?.time) ? current_weather?.grass_pollen : max_pollen} />}
         </Card>
     );
 }

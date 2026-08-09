@@ -8,8 +8,12 @@ export default function UVOverview({ uv_max }: { uv_max: number | undefined }) {
     const { navigate } = useNavigation();
 
     return (
-        <Card className="border-none shadow-none" onClick={() => (navigate("weather", { scrollTo: "uv" }))}>
-            <CardContent className="px-5 py-4">
+        <Card className="border-none shadow-none relative overflow-hidden flex-1 min-w-0" onClick={() => (navigate("weather", { scrollTo: "uv" }))}>
+            <div
+                className="pointer-events-none absolute inset-0 blur-3xl opacity-25"
+                style={{ background: uv_max ? `radial-gradient(ellipse 100% 100% at 50% 0%, ${uvColour(uv_max)}, transparent 90%)` : 'transparent' }}
+            />
+            <CardContent className="px-5 py-4 relative">
                 <div className="flex items-center gap-1.5 mb-2.5">
                     <SunIcon width={16} height={16} color="orange" />
                     <CardTitle className="text-xs text-muted-foreground font-medium tracking-wide">

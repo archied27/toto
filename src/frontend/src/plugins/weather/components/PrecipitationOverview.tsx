@@ -7,8 +7,12 @@ export default function PrecipitationOverview({ precip }: { precip: number | und
     const { navigate } = useNavigation();
 
     return (
-        <Card onClick={() => (navigate("weather", { scrollTo: "precipitation" }))}>
-            <CardContent className="px-1 py-4">
+        <Card onClick={() => (navigate("weather", { scrollTo: "precipitation" }))} className="relative overflow-hidden flex-1 min-w-0">
+            <div
+                className="pointer-events-none absolute inset-0 blur-3xl opacity-25"
+                style={{ background: "radial-gradient(ellipse 100% 100% at 50% 0%, #3b82f6, transparent 90%)" }}
+            />
+            <CardContent className="px-1 py-4 relative">
                 <div className="flex items-center gap-1.5 mb-2.5">
                     <DropletIcon size={16} className="shrink-0 text-blue-400"/>
                     <CardTitle className="text-xs text-muted-foreground font-medium tracking-wide whitespace-normal">

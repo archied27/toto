@@ -36,12 +36,18 @@ export default function TaskCard({ task, refresh, className }: { task: Task; ref
     const { deleteTask } = useDeleteTask();
 
     const [editOpen, setEditOpen] = useState(false);
+    const [sweeping, setSweeping] = useState<"complete" | "incomplete" | null>(null);
 
     const handleToggle = async (e: React.MouseEvent<HTMLButtonElement>) => {
         e.stopPropagation();
-        task.completed = !task.completed;
+        const completing = !task.completed;
+        task.completed = completing;
         await toggleCompletion(task.id);
-        refresh();
+        setSweeping(completing ? "complete" : "incomplete");
+        setTimeout(() => {
+            setSweeping(null);
+            refresh();
+        }, 650);
     };
 
     const handleDelete = async (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -53,7 +59,16 @@ export default function TaskCard({ task, refresh, className }: { task: Task; ref
     return (
         <Dialog>
             <DialogTrigger asChild>
-                <Card className={`p-2 flex flex-row gap-2 border border-border/50 hover:border-border/80 transition-colors ${className || ""}`} onClick={(e) => e.stopPropagation()}>
+                <Card className={`relative overflow-hidden p-2 flex flex-row gap-2 border border-border/50 hover:border-border/80 transition-colors ${className || ""}`} onClick={(e) => e.stopPropagation()}>
+                    {sweeping && (
+                        <div
+                            className={`absolute inset-0 bg-green-500/40 pointer-events-none ${
+                                sweeping === "complete"
+                                    ? "animate-task-complete-sweep"
+                                    : "animate-task-complete-sweep-reverse"
+                            }`}
+                        />
+                    )}
                     <Button onClick={handleToggle} size={"icon"} className="self-center bg-muted h-8 w-8 border-2 border-border">
                         {task.completed ? (
                             <CircleCheckIcon className="w-4 h-4 text-green-500" />

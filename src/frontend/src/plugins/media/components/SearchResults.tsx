@@ -3,8 +3,9 @@ import type { HomePageResult } from "../useMedia";
 import { MovieDetails } from "./MovieDetails";
 import { SeriesDetails } from "./SeriesDetails";
 import { getReleaseTypeDescription } from "../utils";
+import MediaFilter, { type MediaType } from "./MediaFilter";
 
-export function SearchResults({ results, setSearchVisible }: { results: HomePageResult[]; setSearchVisible: (visible: boolean) => void }) {
+export function SearchResults({ results, setSearchVisible, query, mediaType, onMediaTypeChange }: { results: HomePageResult[]; setSearchVisible: (visible: boolean) => void; query: string; mediaType: MediaType; onMediaTypeChange: (type: MediaType) => void }) {
     const [mediaSelected, setMediaSelected] = useState<number | null>(null);
     const [mediaSelectedType, setMediaSelectedType] = useState<"movie" | "show" | null>(null);
 
@@ -27,7 +28,16 @@ export function SearchResults({ results, setSearchVisible }: { results: HomePage
     }
 
     return (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 px-2">
+        <div className="flex flex-col gap-3">
+            {query && (
+                <div className="flex items-center justify-between px-3">
+                    <h2 className="text-lg font-semibold text-foreground">
+                        Results for <span className="text-muted-foreground">"{query}"</span>
+                    </h2>
+                    <MediaFilter value={mediaType} onChange={onMediaTypeChange} />
+                </div>
+            )}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 px-2">
             {results.map((result) => {
                 const releaseStatus = getReleaseTypeDescription(result.release_type, result.release_date);
                 const available = releaseStatus !== "Not Released" && releaseStatus !== "Premiered" && releaseStatus !== "Currently In Theaters";
@@ -61,6 +71,7 @@ export function SearchResults({ results, setSearchVisible }: { results: HomePage
                     </div>
                 );
             })}
+            </div>
         </div>
     )
 }

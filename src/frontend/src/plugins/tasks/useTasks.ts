@@ -21,6 +21,7 @@ export interface Task {
     due_date?: string;
     to_do_date?: string;
     completed: boolean;
+    date_completed?: string;
     labels?: Label[];
     task_list?: TaskList;
 }
@@ -231,6 +232,42 @@ export function useGetAllTasks() {
             .then(data => setTasks(data))
             .catch(() => console.error("Failed to fetch tasks"));
     }, []);
+
+    useEffect(() => { fetchTasks(); }, [fetchTasks]);
+
+    return { tasks, refetch: fetchTasks };
+}
+
+export function useGetLabelTasks(labelId: number | null) {
+    const [tasks, setTasks] = useState<Task[]>([]);
+
+    const fetchTasks = useCallback(() => {
+        if (labelId === null) {
+            setTasks([]);
+            return;
+        }
+        apiFetch<Task[]>(`/tasks/get_label_tasks/${labelId}`)
+            .then(data => setTasks(data))
+            .catch(() => console.error("Failed to fetch label tasks"));
+    }, [labelId]);
+
+    useEffect(() => { fetchTasks(); }, [fetchTasks]);
+
+    return { tasks, refetch: fetchTasks };
+}
+
+export function useGetListTasks(listId: number | null) {
+    const [tasks, setTasks] = useState<Task[]>([]);
+
+    const fetchTasks = useCallback(() => {
+        if (listId === null) {
+            setTasks([]);
+            return;
+        }
+        apiFetch<Task[]>(`/tasks/get_list_tasks/${listId}`)
+            .then(data => setTasks(data))
+            .catch(() => console.error("Failed to fetch list tasks"));
+    }, [listId]);
 
     useEffect(() => { fetchTasks(); }, [fetchTasks]);
 

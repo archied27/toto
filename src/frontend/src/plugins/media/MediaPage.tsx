@@ -2,11 +2,13 @@ import { useState } from "react";
 import { SearchBox } from "./components/SearchBox";
 import { SearchResults } from "./components/SearchResults";
 import { useSearch, type HomePageResult } from "./useMedia";
+import type { MediaType } from "./components/MediaFilter";
 
 export function MediaPage() {
     const [results, setResults] = useState<HomePageResult[]>([]);
     const [searchVisible, setSearchVisible] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
+    const [mediaType, setMediaType] = useState<MediaType>("all");
     const { search, loading } = useSearch();
 
     const handleSearch = async (query: string) => {
@@ -17,9 +19,21 @@ export function MediaPage() {
             return;
         }
 
-        const searchResults = await search(query);
+        const searchResults = await search(query, mediaType);
         if (Array.isArray(searchResults)) {
             setResults(searchResults);
+        }
+    }
+
+    const handleMediaTypeChange = (type: MediaType) => {
+        setMediaType(type);
+
+        if (searchQuery.trim()) {
+            search(searchQuery, type).then(searchResults => {
+                if (Array.isArray(searchResults)) {
+                    setResults(searchResults);
+                }
+            });
         }
     }
 
@@ -31,7 +45,7 @@ export function MediaPage() {
                 </div>
             )}
             {results.length > 0 ? (
-                <SearchResults setSearchVisible={setSearchVisible} results={results} />
+                <SearchResults setSearchVisible={setSearchVisible} results={results} query={searchQuery} mediaType={mediaType} onMediaTypeChange={handleMediaTypeChange} />
 
             ) : (<></>
             )}

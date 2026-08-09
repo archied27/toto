@@ -22,8 +22,8 @@ class MPVRouter:
     def play(self, file: str, duration: int):
         return self.controller.play(file, duration)
 
-    async def search_tmdb(self, query: str):
-        return await self.controller.search_tmdb(query)
+    async def search_tmdb(self, query: str, media_type: str = "all"):
+        return await self.controller.search_tmdb(query, media_type)
 
     def toggle_pause(self):
         return self.controller.toggle_pause()

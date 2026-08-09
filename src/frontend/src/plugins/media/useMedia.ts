@@ -59,10 +59,10 @@ export interface FullSeriesDetails {
 export function useSearch() {
     const [loading, setLoading] = useState(false);
 
-    const search = useCallback(async (query: string): Promise<HomePageResult[]> => {
+    const search = useCallback(async (query: string, mediaType: "all" | "movie" | "tv" = "all"): Promise<HomePageResult[]> => {
         setLoading(true);
         try {
-            const data = await apiFetch(`/mpv/search?query=${query}`, {
+            const data = await apiFetch(`/mpv/search?query=${query}&media_type=${mediaType}`, {
                 method: "GET",
             });
             return Array.isArray(data) ? data : [];
