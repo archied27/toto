@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { useDeleteTask, useToggleTaskCompletion, type Task } from "../useTasks";
+import { useDeleteTask, useToggleTaskCompletion, type SweepDirection, type Task } from "../useTasks";
 import { format, isToday, isTomorrow, isYesterday ,isThisWeek, parseISO, startOfWeek, endOfWeek, addWeeks } from "date-fns";
 import { getTextColour } from "../utils";
 import { Button } from "@/components/ui/button";
@@ -30,22 +30,32 @@ export function formatTaskDate(isoString: string): string {
   return format(date, "do MMMM yyyy");
 }
 
-export default function TaskCard({ task, refresh, className }: { task: Task; refresh: () => void; className?: string }) {
+export default function TaskCard({ task, refresh, className, onSweepingChange }: {
+    task: Task;
+    refresh: () => void;
+    className?: string;
+    onSweepingChange?: (taskId: number, direction: SweepDirection | null) => void;
+}) {
 
     const { toggleCompletion } = useToggleTaskCompletion();
     const { deleteTask } = useDeleteTask();
 
     const [editOpen, setEditOpen] = useState(false);
-    const [sweeping, setSweeping] = useState<"complete" | "incomplete" | null>(null);
+    const [sweeping, setSweeping] = useState<SweepDirection | null>(null);
 
     const handleToggle = async (e: React.MouseEvent<HTMLButtonElement>) => {
         e.stopPropagation();
         const completing = !task.completed;
         task.completed = completing;
+        // Let the parent keep this card mounted until the sweep finishes, so a
+        // websocket state update moving the task between sections can't cut the
+        // animation short.
+        onSweepingChange?.(task.id, completing ? "complete" : "incomplete");
         await toggleCompletion(task.id);
         setSweeping(completing ? "complete" : "incomplete");
         setTimeout(() => {
             setSweeping(null);
+            onSweepingChange?.(task.id, null);
             refresh();
         }, 650);
     };
@@ -62,10 +72,10 @@ export default function TaskCard({ task, refresh, className }: { task: Task; ref
                 <Card className={`relative overflow-hidden p-2 flex flex-row gap-2 border border-border/50 hover:border-border/80 transition-colors ${className || ""}`} onClick={(e) => e.stopPropagation()}>
                     {sweeping && (
                         <div
-                            className={`absolute inset-0 bg-green-500/40 pointer-events-none ${
+                            className={`absolute inset-0 pointer-events-none ${
                                 sweeping === "complete"
-                                    ? "animate-task-complete-sweep"
-                                    : "animate-task-complete-sweep-reverse"
+                                    ? "bg-green-500/40 animate-task-complete-sweep"
+                                    : "bg-red-500/40 animate-task-complete-sweep-reverse"
                             }`}
                         />
                     )}

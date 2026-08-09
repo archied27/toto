@@ -32,6 +32,8 @@ export interface TaskState {
     tasks_due_today: Task[];
 }
 
+export type SweepDirection = "complete" | "incomplete";
+
 export function useTaskState() {
     const [taskState, setTaskState] = useState<TaskState | null>(null);
 
