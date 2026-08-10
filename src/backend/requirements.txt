@@ -8,4 +8,4 @@ sentence-transformers
 scikit-learn
 llama-cpp-python
 dateparser
-groq
+openai

@@ -8,12 +8,27 @@ class WeatherCommand(BaseCommand):
 
     def get_intents(self) -> list[IntentSpec]:
         return [
-            IntentSpec("show_weather", "Show Weather", "open the weather app/screen",
-                       ["show weather", "open weather", "display weather"]),
-            IntentSpec("show_pollen", "Show Pollen Levels", "get current pollen/allergen levels",
-                       ["pollen count", "how bad is pollen today", "grass pollen", "hayfever today", "pollen levels"]),
-            IntentSpec("show_current_weather", "Show Current Weather", "get current temperature and conditions",
-                       ["what's the weather", "weather today", "forecast today", "is it cold outside", "what's the weather today"]),
+            IntentSpec(
+                name="show_weather",
+                command_name="Show Weather",
+                description="open the weather app/screen",
+                type="nav",
+                examples=["show weather", "open weather", "display weather"],
+            ),
+            IntentSpec(
+                name="show_pollen",
+                command_name="Show Pollen Levels",
+                description="get current pollen/allergen levels",
+                type="read",
+                examples=["pollen count", "how bad is pollen today", "grass pollen", "hayfever today", "pollen levels"],
+            ),
+            IntentSpec(
+                name="show_current_weather",
+                command_name="Show Current Weather",
+                description="get current temperature and conditions",
+                type="read",
+                examples=["what's the weather", "weather today", "forecast today", "is it cold outside", "what's the weather today"],
+            ),
         ]
 
     async def handle(self, intent: str, extracted: dict, raw: str) -> CommandResult:

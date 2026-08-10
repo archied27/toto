@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
+from typing import Literal, Optional
 from pydantic import BaseModel
 
 @dataclass
@@ -23,6 +23,7 @@ class IntentSpec:
     name: str
     command_name: str # used for confirmation e.g "Add A New Task" or "Show Tomorrow's Tasks"
     description: str
+    type: Literal["nav", "read", "write"]
     examples: list[str]
     slots: Optional[type[BaseModel]] = None  # pydantic model if it needs extracted params
     slot_examples: Optional[list[tuple[str, dict]]] = None  # (example input, expected extracted dict)

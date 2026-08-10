@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import dotenv
@@ -14,9 +15,9 @@ from app.services.dashboard.dashboard_service import DashboardService
 from app.services.pages.pages_service import PageService
 from app.db.manager import DBManager
 from app.core.core import Core
-from app.core.command import router as CommandRouter
+from app.core.command import router as CommandRouter, resolve_write
 import json
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 dotenv.load_dotenv()
@@ -101,6 +102,38 @@ async def handle_command(req: dict):
             "data": result.data
         }
 
+@app.post("/command/stream")
+async def stream_command(req: dict):
+    """
+    req = { input: str }
+
+    streams command-processing events as SSE (text/event-stream). event types:
+      - {"type": "text", "content": ...}        streamed LLM answer fragment
+      - {"type": "tool_start", "tool", "status"} tool about to execute
+      - {"type": "tool_end", "tool", "result"}   tool finished
+      - {"type": "result", "result": {success, action, response, data}}  terminal
+    """
+    async def event_source():
+        async for event in CommandRouter.process_stream(req["input"]):
+            if event["type"] == "result":
+                r = event["result"]
+                # flatten CommandResult dataclass into the JSON shape the
+                # frontend already expects ({success, action, response, data})
+                event = {
+                    "type": "result",
+                    "result": {
+                        "success": r.success,
+                        "action": r.action,
+                        "response": r.response_text,
+                        "data": r.data,
+                    },
+                }
+            # jsonable_encoder so pydantic models in event data (e.g. task
+            # objects) serialize like they do on the non-streaming endpoints
+            yield f"data: {json.dumps(jsonable_encoder(event))}\n\n"
+
+    return StreamingResponse(event_source(), media_type="text/event-stream")
+
 @app.post("/command/confirm")
 async def confirm_command(req: dict):
     """
@@ -114,6 +147,18 @@ async def confirm_command(req: dict):
             "response": result.response_text,
             "data": result.data
         }
+
+@app.post("/command/confirm-write")
+async def confirm_write_endpoint(req: dict):
+    """
+    req = { token: str, confirmed: bool }
+
+    Resolves a write confirmation that the LLM stream is awaiting.
+    The token was yielded to the frontend as part of a confirm_write
+    event; the frontend echoes it back once the user decides.
+    """
+    ok = resolve_write(req.get("token"), bool(req.get("confirmed", False)))
+    return {"ok": ok}
 
 @app.get("/dashboard")
 async def get_dashboard_state():

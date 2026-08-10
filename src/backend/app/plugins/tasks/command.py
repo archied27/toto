@@ -32,36 +32,72 @@ class TasksCommand(BaseCommand):
 
     def get_intents(self) -> list[IntentSpec]:
         return [
-            IntentSpec("show_tasks", "Show The Tasks Page", "show the list of tasks",
-                       ["show tasks", "open tasks", "display tasks"]),
-            IntentSpec("today_tasks", "Show Today's Tasks", "show the list of tasks for today",
-                       ["show today's tasks", "what are my tasks today", "tasks for today"]),
-            IntentSpec("tomorrow_tasks", "Show Tomorrow's Tasks", "show the list of tasks for tomorrow",
-                       ["show tomorrow's tasks", "what are my tasks tomorrow", "tasks for tomorrow"]),
-            IntentSpec("upcoming_tasks", "Show Upcoming Tasks", "show the list of upcoming tasks (tasks due in the future)",
-                       ["show upcoming tasks", "what are my upcoming tasks", "tasks due in the future", "show tasks due"]),
-            IntentSpec("add_task", "Add A New Task", "add a new task directly from this input",
-                       ["add maths assignment due next friday", "i need to call the dentist tomorrow", "add essay due friday to do on thursday", "add task coding problems for friday", "add ai coursework to do thursday"], 
-                       slots=AddTaskSlots, 
-                       slot_examples=[
-                            ("add essay due friday to do on thursday",
-                            {"task_name": "Essay", "description": None, "due_date": "Friday", "todo_date": "Thursday"}),
-                            ("add ai coursework to do thursday",
-                            {"task_name": "AI Coursework", "description": None, "due_date": None, "todo_date": "Thursday"}),
-                            ("call the dentist tomorrow to schedule an appointment",
-                            {"task_name": "Call Dentist", "description": "Call Dentist to Schedule Appointment", "due_date": None, "todo_date": "Tomorrow"}),
-                            ("add maths cw for friday",
-                            {"task_name": "Maths Coursework", "description": None, "due_date": None, "todo_date": "Friday"}),
-                            ("add ai cw due tomorrow",
-                            {"task_name": "AI Coursework", "description": None, "due_date": "Tomorrow", "todo_date": None}),
-                            ("add ai coursework due tomorrow to do on friday",
-                            {"task_name": "AI Coursework", "description": None, "due_date": "Tomorrow", "todo_date": "Friday"}),
-                            ("add ai coursework due tomorrow to do on friday with extra details",
-                            {"task_name": "AI Coursework", "description": "With Extra Details", "due_date": "Tomorrow", "todo_date": "Friday"}),
-                        ],
-                        loading_msg="Adding Task"),
-            IntentSpec("show_add_task", "Input A New Task", "show the add task form to add a new task",
-                       ["add task", "new task", "create task", "add a new task", "create a new task"]),
+            IntentSpec(
+                name="show_tasks",
+                command_name="Show The Tasks Page",
+                description="show the list of tasks",
+                type="nav",
+                examples=["show tasks", "open tasks", "display tasks"],
+            ),
+            IntentSpec(
+                name="today_tasks",
+                command_name="Show Today's Tasks",
+                description="show the list of tasks for today",
+                type="read",
+                examples=["show today's tasks", "what are my tasks today", "tasks for today"],
+            ),
+            IntentSpec(
+                name="tomorrow_tasks",
+                command_name="Show Tomorrow's Tasks",
+                description="show the list of tasks for tomorrow",
+                type="read",
+                examples=["show tomorrow's tasks", "what are my tasks tomorrow", "tasks for tomorrow"],
+            ),
+            IntentSpec(
+                name="upcoming_tasks",
+                command_name="Show Upcoming Tasks",
+                description="show the list of upcoming tasks (tasks due in the future)",
+                type="read",
+                examples=["show upcoming tasks", "what are my upcoming tasks", "tasks due in the future", "show tasks due"],
+            ),
+            IntentSpec(
+                name="add_task",
+                command_name="Add A New Task",
+                description="add a new task directly from this input",
+                type="write",
+                examples=[
+                    "add maths assignment due next friday",
+                    "i need to call the dentist tomorrow",
+                    "add essay due friday to do on thursday",
+                    "add task coding problems for friday",
+                    "add ai coursework to do thursday",
+                ],
+                slots=AddTaskSlots,
+                slot_examples=[
+                    ("add essay due friday to do on thursday",
+                     {"task_name": "Essay", "description": None, "due_date": "Friday", "todo_date": "Thursday"}),
+                    ("add ai coursework to do thursday",
+                     {"task_name": "AI Coursework", "description": None, "due_date": None, "todo_date": "Thursday"}),
+                    ("call the dentist tomorrow to schedule an appointment",
+                     {"task_name": "Call Dentist", "description": "Call Dentist to Schedule Appointment", "due_date": None, "todo_date": "Tomorrow"}),
+                    ("add maths cw for friday",
+                     {"task_name": "Maths Coursework", "description": None, "due_date": None, "todo_date": "Friday"}),
+                    ("add ai cw due tomorrow",
+                     {"task_name": "AI Coursework", "description": None, "due_date": "Tomorrow", "todo_date": None}),
+                    ("add ai coursework due tomorrow to do on friday",
+                     {"task_name": "AI Coursework", "description": None, "due_date": "Tomorrow", "todo_date": "Friday"}),
+                    ("add ai coursework due tomorrow to do on friday with extra details",
+                     {"task_name": "AI Coursework", "description": "With Extra Details", "due_date": "Tomorrow", "todo_date": "Friday"}),
+                ],
+                loading_msg="Adding Task",
+            ),
+            IntentSpec(
+                name="show_add_task",
+                command_name="Input A New Task",
+                description="show the add task form to add a new task",
+                type="nav",
+                examples=["add task", "new task", "create task", "add a new task", "create a new task"],
+            ),
         ]
 
     def get_intent(self, intent_name: str) -> Optional[IntentSpec]:
@@ -86,9 +122,9 @@ class TasksCommand(BaseCommand):
             return CommandResult(True, "upcoming_tasks", f"Upcoming Tasks: {len(tasks)}", {"tasks": tasks})
         if intent == "add_task":
             # parse due_date and todo_date if they exist
-            if extracted["due_date"]:
+            if extracted.get("due_date"):
                 extracted["due_date"] = dateparser.parse(extracted["due_date"], settings={"PREFER_DATES_FROM": "future", "DATE_ORDER": "DMY"}).date().isoformat()
-            if extracted["todo_date"]:
+            if extracted.get("todo_date"):
                 extracted["todo_date"] = dateparser.parse(extracted["todo_date"], settings={"PREFER_DATES_FROM": "future", "DATE_ORDER": "DMY"}).date().isoformat()
 
             task = CreateTask(

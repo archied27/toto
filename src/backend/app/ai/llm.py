@@ -1,14 +1,81 @@
-from llama_cpp import Llama
-from app.schemas.base_command import IntentSpec
 import json
 import logging
 import os
+import re
+
 import dotenv
-from groq import Groq
+from llama_cpp import Llama
+from openai import AsyncOpenAI, OpenAI
+
+from app.schemas.base_command import BaseCommand, IntentSpec
 
 logger = logging.getLogger(__name__)
 
 dotenv.load_dotenv()
+
+# ---------------------------------------------------------------------------
+# tool calling – generate OpenAI tool definitions from read intents
+# ---------------------------------------------------------------------------
+
+TOOL_NAME_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+
+# system prompt used when the general LLM can call read intents as tools
+TOOL_SYSTEM_PROMPT = (
+    "You are Toto, a helpful personal assistant. You can call tools to fetch "
+    "live data about the user's tasks and weather instead of guessing. "
+    "If a tool is relevant to the question, call it and ground your answer in "
+    "its result. If no tool is relevant, answer from general knowledge and say "
+    "clearly if you don't know. "
+    "Provide short to medium length answers. "
+    "Your responses are rendered using GitHub Flavored Markdown in a React "
+    "application. Use Markdown only, use headings to organise your responses, "
+    "starting with h2's. Do not use filler such as 'Certainly!'"
+    "Finish your answer with a short summary of the sources you used, e.g. 'Sources: tool1, tool2' or 'Sources: none'."
+)
+
+
+def intent_to_tool(spec: IntentSpec) -> dict:
+    """Convert an IntentSpec into an OpenAI function-tool definition."""
+    if not TOOL_NAME_RE.match(spec.name):
+        raise ValueError(f"Intent name {spec.name!r} is not a valid OpenAI tool name")
+    parameters = spec.slots.model_json_schema() if spec.slots else {"type": "object", "properties": {}}
+    return {
+        "type": "function",
+        "function": {
+            "name": spec.name,
+            "description": spec.description,
+            "parameters": parameters,
+        },
+    }
+
+
+def build_tools(plugins: list[BaseCommand], intent_types: tuple[str, ...] = ("read",)) -> list[dict]:
+    """Tool definitions for every intent whose type is in *intent_types*."""
+    return [
+        intent_to_tool(spec)
+        for p in plugins
+        for spec in p.get_intents()
+        if spec.type in intent_types
+    ]
+
+
+def build_tool_index(plugins: list[BaseCommand], intent_types: tuple[str, ...] = ("read",)) -> dict[str, tuple[BaseCommand, IntentSpec]]:
+    """Map tool name → (plugin, spec) so a tool call can be executed."""
+    return {
+        spec.name: (p, spec)
+        for p in plugins
+        for spec in p.get_intents()
+        if spec.type in intent_types
+    }
+
+
+def tool_status_text(spec: IntentSpec) -> str:
+    """Short status line shown above the stream while a tool runs."""
+    label = spec.command_name
+    if label.lower().startswith("show "):
+        label = label[5:]
+    return f"Checking {label.lower()}…"
+
 
 class Extractor:
     """
@@ -70,11 +137,32 @@ class Extractor:
 
 class GeneralLLM:
     """
-    groq llm used for general purposes
+    llm used for general purposes, via an OpenAI-compatible endpoint
     """
-    def __init__(self, model: str = "llama-3.3-70b-versatile"):
-        self.client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    def __init__(self, model: str = "auto"):
+        self.async_client = AsyncOpenAI(
+            base_url=os.getenv("OMNIROUTE_BASE_URL"),
+            api_key=os.getenv("OMNIROUTE_API_KEY"),
+        )
+        self.client = OpenAI(
+            base_url=os.getenv("OMNIROUTE_BASE_URL"),
+            api_key=os.getenv("OMNIROUTE_API_KEY"),
+        )
         self.model = model
+
+    def chat(self, messages: list[dict], tools: list[dict] | None = None, temperature: float = 0.3):
+        kwargs: dict = {"model": self.model, "messages": messages, "temperature": temperature}
+        if tools:
+            kwargs["tools"] = tools
+        return self.client.chat.completions.create(**kwargs)
+
+    async def chat_stream(self, messages: list[dict], tools: list[dict] | None = None, temperature: float = 0.3):
+        kwargs: dict = {"model": self.model, "messages": messages, "temperature": temperature}
+        if tools:
+            kwargs["tools"] = tools
+        stream = await self.async_client.chat.completions.create(**kwargs, stream=True)
+        async for chunk in stream:
+            yield chunk
 
     def ask(self, question: str, context: str | None = None) -> str:
         system_prompt = (
