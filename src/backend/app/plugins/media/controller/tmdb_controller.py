@@ -74,6 +74,7 @@ class TMDBApiController:
                     best = -1.0
                     for logo in img_data["logos"]:
                         if (logo["iso_639_1"] == "en") and (logo["vote_average"] > best):
+                            best = logo["vote_average"]
                             logo_path = logo["file_path"]
 
         release_type = await self.get_movie_release_details(id)
@@ -112,6 +113,7 @@ class TMDBApiController:
                     best = -1.0
                     for logo in img_data["logos"]:
                         if (logo["iso_639_1"] == "en") and (logo["vote_average"] > best):
+                            best = logo["vote_average"]
                             logo_path = logo["file_path"]
 
         if data == None:

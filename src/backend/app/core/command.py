@@ -15,7 +15,7 @@ import json
 import logging
 
 logger = logging.getLogger(__name__)
-MAX_TOOL_ROUNDS = 5
+MAX_TOOL_ROUNDS = 10
 WRITE_CONFIRM_TIMEOUT = 120.0  # seconds to wait for the user to confirm a write
 
 
@@ -208,12 +208,13 @@ class CommandRouter:
                     else:
                         # --- read: execute immediately (unchanged) ---
                         if spec_entry:
-                            _, spec = spec_entry
+                            plugin, spec = spec_entry
 
                             # Let the frontend know what is happening.
                             yield {
                                 "type": "tool_start",
                                 "tool": call["name"],
+                                "plugin": plugin.name,
                                 "status": tool_status_text(spec),
                             }
 
@@ -241,13 +242,44 @@ class CommandRouter:
             "content": "I couldn't complete the request because too many tool calls were required.",
         }
 
-    async def process_stream(self, raw: str):
+    async def _run_llm_stream(self, raw: str):
+        """Stream the general LLM (with tool calling) to completion, then yield
+        the terminal result.  Shared by the low-confidence fallback and the
+        explicit "llm" command mode."""
+        try:
+            answer_parts = []
+            async for event in self._llm_stream(raw):
+                if event["type"] == "text":
+                    answer_parts.append(event["content"])
+                yield event
+
+            yield {"type": "result", "result": CommandResult(
+                success=True,
+                action='LLM_RESPONSE',
+                response_text="".join(answer_parts),
+                data={},
+            )}
+        except Exception as e:
+            yield {"type": "result", "result": CommandResult(
+                success=False,
+                action='LLM_ERROR',
+                response_text=f"Error in LLM response: {str(e)}",
+                data={},
+            )}
+
+    async def process_stream(self, raw: str, mode: str = "normal"):
         if not raw or not raw.strip():
             yield {"type": "result", "result": CommandResult(success=False, action='EMPTY', response_text="Nothing to process", data={})}
             return
 
         raw = raw.strip()
         self._ensure_built()
+
+        if mode == "llm":
+            # Explicit "straight to LLM" mode — skip the classifier entirely.
+            async for event in self._run_llm_stream(raw):
+                yield event
+            return
 
         match = await self.classifier.classify(raw)
 
@@ -256,27 +288,9 @@ class CommandRouter:
             return
 
         if match.confidence < self.confidence_threshold:
-            try:
-                # fall through to llm
-                answer_parts = []
-                async for event in self._llm_stream(raw):
-                    if event["type"] == "text":
-                        answer_parts.append(event["content"])
-                    yield event
-
-                yield {"type": "result", "result": CommandResult(
-                    success=True,
-                    action='LLM_RESPONSE',
-                    response_text="".join(answer_parts),
-                    data={},
-                )}
-            except Exception as e:
-                yield {"type": "result", "result": CommandResult(
-                    success=False,
-                    action='LLM_ERROR',
-                    response_text=f"Error in LLM response: {str(e)}",
-                    data={},
-                )}
+            # fall through to llm
+            async for event in self._run_llm_stream(raw):
+                yield event
             return
 
         plugin = self._get_plugin(match.plugin)

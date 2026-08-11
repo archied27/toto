@@ -22,13 +22,15 @@ TOOL_NAME_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 # system prompt used when the general LLM can call read intents as tools
 TOOL_SYSTEM_PROMPT = (
     "You are Toto, a helpful personal assistant. You can call tools to fetch "
-    "live data about the user's tasks and weather instead of guessing. "
+    "live data about the user's tasks, weather and web searches instead of guessing. "
     "If a tool is relevant to the question, call it and ground your answer in "
     "its result. If no tool is relevant, answer from general knowledge and say "
     "clearly if you don't know. "
+    "If you use the web search, only use it a maximum of 2 times, DO NOT USE IT MORE THAN 2 TIMES. "
     "Provide short to medium length answers. "
-    "Your responses are rendered using GitHub Flavored Markdown in a React "
-    "application. Use Markdown only, use headings to organise your responses, "
+    "Your responses are rendered using GitHub Flavored Markdown and your HTML is rendered directly (when not in code blocks)"
+    "in a React application. Use coloured text where necessary to highlight and signify your answers. "
+    "Use Markdown and HTML only, use headings to organise your responses, "
     "starting with h2's. Do not use filler such as 'Certainly!'"
     "Finish your answer with a short summary of the sources you used, e.g. 'Sources: tool1, tool2' or 'Sources: none'."
 )
@@ -71,10 +73,22 @@ def build_tool_index(plugins: list[BaseCommand], intent_types: tuple[str, ...] =
 
 def tool_status_text(spec: IntentSpec) -> str:
     """Short status line shown above the stream while a tool runs."""
-    label = spec.command_name
-    if label.lower().startswith("show "):
-        label = label[5:]
-    return f"Checking {label.lower()}…"
+    label = spec.command_name.strip()
+    if not label:
+        return "Working…"
+    # Turn the leading verb of the command name into a natural status line:
+    # "Show Today's Tasks" -> "Checking today's tasks…", "Search The Web" ->
+    # "Searching the web…", "Add A New Task" -> "adding a new task…".
+    verbs = {
+        "show": "Checking",
+        "search": "Searching",
+        "add": "Adding",
+        "get": "Checking",
+    }
+    first, _, rest = label.partition(" ")
+    verb = verbs.get(first.lower(), "Checking")
+    suffix = f" {rest.lower()}" if rest else ""
+    return f"{verb}{suffix}…"
 
 
 class Extractor:

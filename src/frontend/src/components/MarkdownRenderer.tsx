@@ -2,7 +2,8 @@ import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import { isValidElement, useState, type ReactNode } from "react";
+import rehypeRaw from "rehype-raw";
+import { isValidElement, useState, type ReactElement, type ReactNode } from "react";
 import { CheckIcon, CopyIcon } from "lucide-react";
 
 // Pull the plain source text out of a highlighted code block so the copy
@@ -85,20 +86,29 @@ const totoMarkdownComponents: Components = {
     </li>
   ),
 
-  // inline code stays a small pill; fenced blocks become a CodeBlock
-  code: ({ node, className, children }) => {
-    const parent = (node as { parent?: { tagName?: string } } | undefined)?.parent;
-    if (parent?.tagName === "pre") {
-      const language = /language-([\w-]+)/.exec(className ?? "")?.[1];
-      return <CodeBlock language={language}>{children}</CodeBlock>;
-    }
-    return (
-      <code className="px-1.5 py-0.5 rounded-md bg-muted text-xs font-mono text-foreground/80">{children}</code>
-    );
-  },
+  // inline code stays a small pill. Fenced blocks are detected in the `pre`
+  // component below — in react-markdown v10 hast nodes carry no `parent` link,
+  // so a `code` element can't tell here whether it sits inside a <pre>.
+  code: ({ children }) => (
+    <code className="px-1.5 py-0.5 rounded-md bg-muted text-xs font-mono text-foreground/80">{children}</code>
+  ),
 
-  // CodeBlock owns the <pre> — don't let react-markdown wrap it in another one
-  pre: ({ children }) => <>{children}</>,
+  // A fenced block arrives as <pre><code …>…</code></pre>; the `pre` component
+  // is handed the already-rendered <code> element, so swap it for a CodeBlock
+  // (which owns its own <pre>). The element's `node` prop carries the hast node
+  // — its tagName is what tells a fenced block apart from a raw <pre>. Anything
+  // else (raw HTML from the model) falls through to default rendering.
+  pre: ({ children }) => {
+    if (!isValidElement(children)) return <>{children}</>;
+    const child = children as ReactElement<{
+      node?: { tagName?: string };
+      className?: string;
+      children?: ReactNode;
+    }>;
+    if (child.props.node?.tagName !== "code") return <>{children}</>;
+    const language = /language-([\w-]+)/.exec(child.props.className ?? "")?.[1];
+    return <CodeBlock language={language}>{child.props.children}</CodeBlock>;
+  },
 
   // blockquote becomes a soft callout, not a browser-default left-border
   blockquote: ({ children }) => (
@@ -124,7 +134,12 @@ const totoMarkdownComponents: Components = {
 
 export function MarkdownRenderer({ content }: { content: string }) {
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={totoMarkdownComponents}>
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      rehypePlugins={[rehypeHighlight, rehypeRaw]}
+      remarkRehypeOptions={{ allowDangerousHtml: true }}
+      components={totoMarkdownComponents}
+    >
       {content}
     </ReactMarkdown>
   );

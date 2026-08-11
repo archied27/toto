@@ -10,6 +10,7 @@ export interface CommandResult {
 export interface PluginManifest {
   id: string
   label: string
+  icon: ComponentType<{ className?: string }>
   page: ComponentType
   widgets: {
     hero: ComponentType | null

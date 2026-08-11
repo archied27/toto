@@ -2,6 +2,8 @@
 handles all interaction with the database for the tasks plugin
 """
 
+from typing import Optional
+
 from app.core.core import Core
 from app.plugins.tasks.schemas import Task, TaskList, Label, TasksState, CreateLabel, CreateTaskList, CreateTask
 
@@ -301,9 +303,9 @@ class TasksDBController:
             tasks.append(self._build_task(row, labels, task_list))
         return tasks
 
-    async def get_tasks_with_a_due_date(self) -> list[Task]:
+    async def get_upcoming_tasks(self) -> list[Task]:
         rows = await self.core.db_manager.fetch_all(
-            "SELECT * FROM tasks_tasks WHERE due_date IS NOT NULL"
+            "SELECT * FROM tasks_tasks WHERE (due_date >= date('now') OR to_do_date >= date('now')) AND completed = 0"
         )
         tasks = []
         for row in rows:
@@ -328,3 +330,62 @@ class TasksDBController:
             "UPDATE tasks_tasks SET completed = ?, date_completed = ? WHERE id = ?",
             (new_status, date_completed, task_id)
         )
+
+    async def get_tasks_on_date(self, iso_date: str, date_type: str = "either") -> list[Task]:
+        if date_type == "due":
+            where, params = "due_date = ?", (iso_date,)
+        elif date_type == "to_do":
+            where, params = "to_do_date = ?", (iso_date,)
+        else:
+            where, params = "due_date = ? OR to_do_date = ?", (iso_date, iso_date)
+        rows = await self.core.db_manager.fetch_all(
+            f"SELECT * FROM tasks_tasks WHERE {where}", params
+        )
+        tasks = []
+        for row in rows:
+            labels = await self._fetch_labels_for_task(row["id"])
+            task_list = await self._fetch_list_for_task(row["list_id"]) if row["list_id"] else None
+            tasks.append(self._build_task(row, labels, task_list))
+        return tasks
+
+    async def get_tasks_between(self, start: str, end: str) -> list[Task]:
+        rows = await self.core.db_manager.fetch_all(
+            "SELECT * FROM tasks_tasks WHERE (due_date BETWEEN ? AND ?) OR (to_do_date BETWEEN ? AND ?)",
+            (start, end, start, end),
+        )
+        tasks = []
+        for row in rows:
+            labels = await self._fetch_labels_for_task(row["id"])
+            task_list = await self._fetch_list_for_task(row["list_id"]) if row["list_id"] else None
+            tasks.append(self._build_task(row, labels, task_list))
+        return tasks
+
+    async def get_tasks_completed_on(self, iso_date: str) -> list[Task]:
+        rows = await self.core.db_manager.fetch_all(
+            "SELECT * FROM tasks_tasks WHERE completed = 1 AND substr(date_completed, 1, 10) = ?",
+            (iso_date,),
+        )
+        tasks = []
+        for row in rows:
+            labels = await self._fetch_labels_for_task(row["id"])
+            task_list = await self._fetch_list_for_task(row["list_id"]) if row["list_id"] else None
+            tasks.append(self._build_task(row, labels, task_list))
+        return tasks
+
+    async def get_list_by_name(self, name: str) -> Optional[TaskList]:
+        row = await self.core.db_manager.fetch_one(
+            "SELECT id, name, colour FROM tasks_list WHERE lower(name) = lower(?)",
+            (name,),
+        )
+        if not row:
+            return None
+        return TaskList(id=row["id"], name=row["name"], colour=row["colour"])
+
+    async def get_label_by_name(self, name: str) -> Optional[Label]:
+        row = await self.core.db_manager.fetch_one(
+            "SELECT id, name, colour FROM tasks_labels WHERE lower(name) = lower(?)",
+            (name,),
+        )
+        if not row:
+            return None
+        return Label(id=row["id"], name=row["name"], colour=row["colour"])

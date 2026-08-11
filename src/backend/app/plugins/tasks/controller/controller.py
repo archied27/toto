@@ -2,6 +2,8 @@
 contains logic for tasks plugin
 """
 
+from typing import Optional
+
 from app.plugins.tasks.controller.db_controller import TasksDBController
 from app.core.core import Core
 from app.plugins.tasks.schemas import Task, TaskList, Label, TasksState, CreateLabel, CreateTaskList, CreateTask
@@ -155,9 +157,24 @@ class TasksController:
 
     async def get_upcoming_tasks(self) -> list[Task]:
         # get all tasks that are due in the next 7 days
-        return await self.db_controller.get_tasks_with_a_due_date()
+        return await self.db_controller.get_upcoming_tasks()
 
     async def toggle_task_completion(self, task_id: str):
         # toggle the completion status of a task
         await self.db_controller.toggle_task_completion(task_id)
         await self.update_state()
+
+    async def get_tasks_on_date(self, iso_date: str, date_type: str = "either") -> list[Task]:
+        return await self.db_controller.get_tasks_on_date(iso_date, date_type)
+
+    async def get_tasks_between(self, start: str, end: str) -> list[Task]:
+        return await self.db_controller.get_tasks_between(start, end)
+
+    async def get_tasks_completed_on(self, iso_date: str) -> list[Task]:
+        return await self.db_controller.get_tasks_completed_on(iso_date)
+
+    async def get_list_by_name(self, name: str) -> Optional[TaskList]:
+        return await self.db_controller.get_list_by_name(name)
+
+    async def get_label_by_name(self, name: str) -> Optional[Label]:
+        return await self.db_controller.get_label_by_name(name)

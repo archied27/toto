@@ -105,16 +105,20 @@ async def handle_command(req: dict):
 @app.post("/command/stream")
 async def stream_command(req: dict):
     """
-    req = { input: str }
+    req = { input: str, mode?: "normal" | "llm" }
 
     streams command-processing events as SSE (text/event-stream). event types:
       - {"type": "text", "content": ...}        streamed LLM answer fragment
       - {"type": "tool_start", "tool", "status"} tool about to execute
       - {"type": "tool_end", "tool", "result"}   tool finished
       - {"type": "result", "result": {success, action, response, data}}  terminal
+
+    mode: "normal" (default) classifies and routes as usual; "llm" skips the
+    classifier and sends the input straight to the general LLM (with tools).
     """
+    mode = req.get("mode", "normal")
     async def event_source():
-        async for event in CommandRouter.process_stream(req["input"]):
+        async for event in CommandRouter.process_stream(req["input"], mode=mode):
             if event["type"] == "result":
                 r = event["result"]
                 # flatten CommandResult dataclass into the JSON shape the

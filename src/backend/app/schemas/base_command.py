@@ -33,4 +33,12 @@ class BaseCommand(ABC):
     name: str # e.g weather, tasks, etc.
 
     def get_intents(self) -> list[IntentSpec]: ...
+
+    def get_intent(self, intent_name: str) -> Optional[IntentSpec]:
+        """Find an intent by name, or None if this plugin doesn't own it."""
+        for intent in self.get_intents():
+            if intent.name == intent_name:
+                return intent
+        return None
+
     async def handle(self, intent: str, extracted: dict, raw: str) -> CommandResult: ...

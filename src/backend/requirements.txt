@@ -9,3 +9,4 @@ scikit-learn
 llama-cpp-python
 dateparser
 openai
+ddgs

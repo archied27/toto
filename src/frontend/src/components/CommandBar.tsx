@@ -1,16 +1,29 @@
 import { useState } from "react";
+import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { useNavigation } from "@/hooks/NavigationContext";
 import CommandResultRenderer from "./CommandResultRenderer";
 import StreamingLLMResponse from "./StreamingLLMResponse";
 import WriteConfirmDialog from "./WriteConfirmDialog";
 import type { CommandResult } from "@/plugins/types";
-import { LoaderCircleIcon, TriangleAlertIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  LoaderCircleIcon,
+  TriangleAlertIcon,
+  XIcon,
+} from "lucide-react";
 
 // The event vocabulary emitted by POST /command/stream.
 type StreamEvent =
   | { type: "text"; content: string }
-  | { type: "tool_start"; tool: string; status: string }
+  | { type: "tool_start"; tool: string; plugin: string; status: string }
   | { type: "tool_end"; tool: string; result: string }
   | {
       type: "confirm_write";
@@ -65,8 +78,7 @@ export default function CommandBar({
   const [searchTerm, setSearchTerm] = useState("");
   const [result, setResult] = useState<CommandResult | null>(null);
   const [streaming, setStreaming] = useState<{
-    statusText: string;
-    statusActive: boolean;
+    tools: { plugin: string; status: string; active: boolean }[];
     content: string;
   } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -75,6 +87,7 @@ export default function CommandBar({
     title: string;
     args: Record<string, unknown>;
   } | null>(null);
+  const [mode, setMode] = useState<"normal" | "llm">("normal");
   const { navigate } = useNavigation();
 
   // POST to /command/confirm-write with the user's decision, then clear
@@ -101,14 +114,13 @@ export default function CommandBar({
 
     // Tracked locally so each event re-sets the full streaming state.
     let content = "";
-    let statusText = "";
-    let statusActive = false;
+    let tools: { plugin: string; status: string; active: boolean }[] = [];
 
     try {
       const res = await fetch("/command/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: searchTerm }),
+        body: JSON.stringify({ input: searchTerm, mode }),
       });
 
       if (!res.ok || !res.body) {
@@ -118,16 +130,21 @@ export default function CommandBar({
       for await (const event of readStreamEvents(res.body)) {
         if (event.type === "text") {
           content += event.content;
-          setStreaming({ statusText, statusActive, content });
+          setStreaming({ tools, content });
         } else if (event.type === "tool_start") {
-          statusText = event.status;
-          statusActive = true;
-          setStreaming({ statusText, statusActive, content });
+          // Each tool call gets its own line — a new entry, running.
+          tools = [
+            ...tools,
+            { plugin: event.plugin, status: event.status, active: true },
+          ];
+          setStreaming({ tools, content });
         } else if (event.type === "tool_end") {
-          // keep the status line visible once the tool finishes — only stop
-          // the spinner so it no longer looks like it's still running.
-          statusActive = false;
-          setStreaming({ statusText, statusActive, content });
+          // Keep the line visible once its tool finishes — only stop the
+          // spinner so it no longer looks like it's still running.
+          tools = tools.map((t, i) =>
+            i === tools.length - 1 ? { ...t, active: false } : t
+          );
+          setStreaming({ tools, content });
         } else if (event.type === "confirm_write") {
           // LLM wants to execute a write — pause and ask the user.
           setPendingWrite({
@@ -144,7 +161,7 @@ export default function CommandBar({
           }
           if (r.success && r.action === "LLM_RESPONSE") {
             // The streaming view already shows the full answer — keep it.
-            setStreaming({ statusText, statusActive, content });
+            setStreaming({ tools, content });
           } else {
             // Data card or error — render through the normal renderer.
             setStreaming(null);
@@ -156,6 +173,7 @@ export default function CommandBar({
       console.error("Command error:", err);
     } finally {
       setLoading(false);
+      setMode("normal");
     }
   };
 
@@ -176,8 +194,7 @@ export default function CommandBar({
           <CommandResultRenderer result={result} onResult={setResult} />
         ) : streaming ? (
           <StreamingLLMResponse
-            statusText={streaming.statusText}
-            statusActive={streaming.statusActive}
+            tools={streaming.tools}
             content={streaming.content}
           />
         ) : !pendingWrite ? (
@@ -186,7 +203,32 @@ export default function CommandBar({
           </div>
         ) : null}
       </div>
-      <div className="pb-12 pt-10 px-4 flex flex-col items-center gap-4">
+      <div className="pb-12 pt-10 px-4 flex items-end gap-2">
+        {/* Command mode lives in a dropdown beside the input rather than a
+            full-width button row above it. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loading}
+              aria-label="Command mode"
+              className="shrink-0"
+            >
+              {mode === "normal" ? "Normal" : "LLM"}
+              <ChevronDownIcon className="opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuRadioGroup
+              value={mode}
+              onValueChange={(value) => setMode(value as "normal" | "llm")}
+            >
+              <DropdownMenuRadioItem value="normal">Normal</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="llm">LLM</DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <div className="relative w-full">
           <Textarea
             className="text-foreground pr-10 leading-5 min-h-9 max-h-[calc(3_*_1.25rem_+_1rem_+_2px)] resize-none overflow-y-auto"
@@ -200,9 +242,18 @@ export default function CommandBar({
             // A write is awaiting confirmation — a warning instead of the
             // spinner signals the user needs to act.
             <TriangleAlertIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-amber-500 animate-pulse" />
+          ) : loading ? (
+            <LoaderCircleIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground animate-spin" />
           ) : (
-            loading && (
-              <LoaderCircleIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground animate-spin" />
+            searchTerm && (
+              <button
+                type="button"
+                aria-label="Clear input"
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 p-0.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
             )
           )}
         </div>
