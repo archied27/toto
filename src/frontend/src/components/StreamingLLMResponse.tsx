@@ -27,8 +27,14 @@ export default function StreamingLLMResponse({
   content: string;
 }) {
   const visible = tools.slice(-MAX_TOOLS);
+  const hiddenCount = tools.length - visible.length;
   return (
     <Card className="font-serif p-5 border-none shadow-none flex flex-col gap-2">
+      {hiddenCount > 0 && (
+        <p className="text-xs font-medium text-muted-foreground">
+          +{hiddenCount} more
+        </p>
+      )}
       {visible.map((tool, i) => {
         const Icon = PLUGIN_ICONS[tool.plugin] ?? WrenchIcon;
         return (

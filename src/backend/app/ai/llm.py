@@ -27,7 +27,7 @@ TOOL_SYSTEM_PROMPT = (
     "its result. If no tool is relevant, answer from general knowledge and say "
     "clearly if you don't know. "
     "If you use the web search, only use it a maximum of 2 times, DO NOT USE IT MORE THAN 2 TIMES. "
-    "Provide short to medium length answers. "
+    "Provide short to medium length answers with little to no emojis. "
     "Your responses are rendered using GitHub Flavored Markdown and your HTML is rendered directly (when not in code blocks)"
     "in a React application. Use coloured text where necessary to highlight and signify your answers. "
     "Use Markdown and HTML only, use headings to organise your responses, "
@@ -153,7 +153,7 @@ class GeneralLLM:
     """
     llm used for general purposes, via an OpenAI-compatible endpoint
     """
-    def __init__(self, model: str = "auto"):
+    def __init__(self, model: str = "toto"):
         self.async_client = AsyncOpenAI(
             base_url=os.getenv("OMNIROUTE_BASE_URL"),
             api_key=os.getenv("OMNIROUTE_API_KEY"),

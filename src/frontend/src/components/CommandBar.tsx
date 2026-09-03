@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import {
   DropdownMenu,
@@ -14,7 +13,8 @@ import StreamingLLMResponse from "./StreamingLLMResponse";
 import WriteConfirmDialog from "./WriteConfirmDialog";
 import type { CommandResult } from "@/plugins/types";
 import {
-  ChevronDownIcon,
+  BrainIcon,
+  ZapIcon,
   LoaderCircleIcon,
   TriangleAlertIcon,
   XIcon,
@@ -204,28 +204,34 @@ export default function CommandBar({
         ) : null}
       </div>
       <div className="pb-12 pt-10 px-4 flex items-end gap-2">
-        {/* Command mode lives in a dropdown beside the input rather than a
-            full-width button row above it. */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
+            <button
               type="button"
-              variant="outline"
-              disabled={loading}
               aria-label="Command mode"
-              className="shrink-0"
+              disabled={loading}
+              className="shrink-0 p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {mode === "normal" ? "Normal" : "LLM"}
-              <ChevronDownIcon className="opacity-50" />
-            </Button>
+              {mode === "normal" ? (
+                <ZapIcon className="w-5 h-5" />
+              ) : (
+                <BrainIcon className="w-5 h-5" />
+              )}
+            </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
+          <DropdownMenuContent align="start" className="flex flex-col p-2 min-w-[100px]">
             <DropdownMenuRadioGroup
               value={mode}
               onValueChange={(value) => setMode(value as "normal" | "llm")}
             >
-              <DropdownMenuRadioItem value="normal">Normal</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="llm">LLM</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="normal" className="flex items-center gap-2 pr-12">
+                <ZapIcon className="w-4 h-4" />
+                Normal
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="llm" className="flex items-center gap-2 pr-12">
+                <BrainIcon className="w-4 h-4" />
+                LLM
+              </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>

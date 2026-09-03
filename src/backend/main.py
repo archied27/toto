@@ -16,6 +16,7 @@ from app.services.pages.pages_service import PageService
 from app.db.manager import DBManager
 from app.core.core import Core
 from app.core.command import router as CommandRouter, resolve_write
+from app.core.agent_registry import AgentRegistry, handle_agent_connection
 import json
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -46,6 +47,10 @@ async def lifespan(app: FastAPI):
     plugin_manager = PluginManager(core, app, ws_manager)
     await plugin_manager.register_plugins()
 
+    # Agent registry for device-agent coordination
+    agent_registry = AgentRegistry()
+    CommandRouter.set_agent_registry(agent_registry)
+
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
         return FileResponse("../frontend/dist/index.html")
@@ -57,6 +62,7 @@ async def lifespan(app: FastAPI):
     app.state.ws_manager = ws_manager
     app.state.dashboard_service = dashboard
     app.state.pages_service = pages
+    app.state.agent_registry = agent_registry
 
     # load initial state for dashboard and pages
     await pages.update_pages()
@@ -188,6 +194,20 @@ async def websocket_endpoint(websocket: WebSocket):
                 pass
     except WebSocketDisconnect:
         await app.state.ws_manager.disconnect(websocket)
+
+@app.websocket("/agent/ws")
+async def agent_websocket_endpoint(websocket: WebSocket):
+    """
+    WebSocket endpoint for device-agent connections.
+
+    Devices connect here to register their capabilities and receive
+    dispatch requests from the LLM tool-calling loop.
+    """
+    await websocket.accept()
+    await handle_agent_connection(
+        websocket, app.state.agent_registry,
+        os.getenv("AGENT_SHARED_SECRET", "")
+    )
 
 # Static files - order matters, all before the catch-all
 @app.get("/manifest.json")

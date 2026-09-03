@@ -3,7 +3,7 @@ handles parsing commands from command bar
 """
 import asyncio
 import uuid
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from fastapi.encoders import jsonable_encoder
 
@@ -14,8 +14,11 @@ from app.ai.llm import Extractor, GeneralLLM, TOOL_SYSTEM_PROMPT, build_tool_ind
 import json
 import logging
 
+if TYPE_CHECKING:
+    from app.core.agent_registry import AgentRegistry
+
 logger = logging.getLogger(__name__)
-MAX_TOOL_ROUNDS = 10
+MAX_TOOL_ROUNDS = 5  # maximum number of tool calls the model can make before we give up
 WRITE_CONFIRM_TIMEOUT = 120.0  # seconds to wait for the user to confirm a write
 
 
@@ -58,6 +61,8 @@ class CommandRouter:
         self._built = False
         self._tools: list[dict] = []
         self._tool_index: dict = {}
+        self._plugin_tools: list[dict] = []
+        self._agent_registry: Optional["AgentRegistry"] = None
 
     def register_plugin(self, plugin: BaseCommand) -> None:
         if not isinstance(plugin, BaseCommand):
@@ -65,14 +70,38 @@ class CommandRouter:
         self.plugins.append(plugin)
         self._built = False
 
+    def set_agent_registry(self, registry: "AgentRegistry") -> None:
+        """Set the agent registry for device-tool routing."""
+        self._agent_registry = registry
+        self._built = False
+
     def _ensure_built(self):
         if not self._built:
             self.classifier.build(self.plugins)
-            self._tools = build_tools(self.plugins, intent_types=("read", "write"))
+            self._plugin_tools = build_tools(self.plugins, intent_types=("read", "write"))
             self._tool_index = build_tool_index(self.plugins, intent_types=("read", "write"))
             self._built = True
+        # Always recompute device tools (devices connect/disconnect at runtime)
+        device_tools = self._agent_registry.build_tools() if self._agent_registry else []
+        self._tools = self._plugin_tools + device_tools
 
     async def _execute_tool(self, name: str, args: dict, raw: str) -> str:
+        # Device tool?
+        if name.startswith("device__"):
+            parts = name.split("__", 2)
+            if len(parts) == 3:
+                _, device_id, action = parts
+                if not self._agent_registry:
+                    return f"Error: agent registry not configured"
+                try:
+                    result = await self._agent_registry.dispatch(device_id, action, args)
+                    return json.dumps(result)
+                except Exception as e:
+                    logger.error("device tool %s raised: %s", name, e)
+                    return f"Error: {str(e)}"
+            return f"Error: invalid device tool name '{name}'"
+
+        # Plugin tool
         entry = self._tool_index.get(name)
         if not entry:
             return f"Error: unknown tool '{name}'"
@@ -170,7 +199,18 @@ class CommandRouter:
                 else:
                     spec_entry = self._tool_index.get(call["name"])
                     spec = spec_entry[1] if spec_entry else None
+                    tool_name = call["name"]
 
+                    # Determine if this is a device tool
+                    is_device_tool = tool_name.startswith("device__")
+                    device_capability = None
+                    if is_device_tool and self._agent_registry:
+                        parts = tool_name.split("__", 2)
+                        if len(parts) == 3:
+                            _, device_id, action = parts
+                            device_capability = self._agent_registry.get_capability(device_id, action)
+
+                    # Plugin write intent
                     if spec is not None and spec.type == "write":
                         # --- write: pause the stream and wait for user
                         # confirmation via POST /command/confirm-write ---
@@ -205,8 +245,39 @@ class CommandRouter:
                                 "The user declined this action. "
                                 "Do not claim that it was performed."
                             )
+                    # Device tool with write capability
+                    elif device_capability is not None and device_capability.write:
+                        token = uuid.uuid4().hex
+                        entry = _PendingWrite()
+                        _pending_writes[token] = entry
+
+                        yield {
+                            "type": "confirm_write",
+                            "token": token,
+                            "tool": tool_name,
+                            "title": device_capability.name,
+                            "args": args,
+                        }
+
+                        try:
+                            await asyncio.wait_for(
+                                entry.event.wait(), timeout=WRITE_CONFIRM_TIMEOUT
+                            )
+                            confirmed = entry.confirmed
+                        except asyncio.TimeoutError:
+                            confirmed = False
+                        finally:
+                            _pending_writes.pop(token, None)
+
+                        if confirmed:
+                            result = await self._execute_tool(tool_name, args, raw)
+                        else:
+                            result = (
+                                "The user declined this action. "
+                                "Do not claim that it was performed."
+                            )
                     else:
-                        # --- read: execute immediately (unchanged) ---
+                        # --- read: execute immediately ---
                         if spec_entry:
                             plugin, spec = spec_entry
 
@@ -217,6 +288,17 @@ class CommandRouter:
                                 "plugin": plugin.name,
                                 "status": tool_status_text(spec),
                             }
+                        elif is_device_tool and device_capability:
+                            # Device read tool
+                            parts = tool_name.split("__", 2)
+                            if len(parts) == 3:
+                                _, device_id, _ = parts
+                                yield {
+                                    "type": "tool_start",
+                                    "tool": tool_name,
+                                    "plugin": device_id,
+                                    "status": f"Using {device_id}…",
+                                }
 
                         result = await self._execute_tool(
                             call["name"],

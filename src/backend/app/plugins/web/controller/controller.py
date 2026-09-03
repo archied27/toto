@@ -8,7 +8,7 @@ from ddgs import DDGS
 SNIPPET_CAP = 200
 
 class WebController:
-    async def search(self, query: str, max_results: int = 10) -> list[dict]:
+    async def search(self, query: str, max_results: int = 5) -> list[dict]:
         # DDGS.text() is synchronous — run it off the event loop so a slow
         # search doesn't block the whole server.
         return await asyncio.to_thread(self._run_search, query, max_results)
