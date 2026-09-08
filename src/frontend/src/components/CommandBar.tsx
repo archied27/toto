@@ -3,8 +3,7 @@ import { Textarea } from "./ui/textarea";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { useNavigation } from "@/hooks/NavigationContext";
@@ -19,6 +18,7 @@ import {
   TriangleAlertIcon,
   XIcon,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // The event vocabulary emitted by POST /command/stream.
 type StreamEvent =
@@ -220,19 +220,26 @@ export default function CommandBar({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="flex flex-col p-2 min-w-[100px]">
-            <DropdownMenuRadioGroup
-              value={mode}
-              onValueChange={(value) => setMode(value as "normal" | "llm")}
+            <DropdownMenuItem
+              onClick={() => setMode("normal")}
+              className={cn(
+                "flex items-center gap-2 cursor-pointer",
+                mode === "normal" && "bg-accent text-accent-foreground"
+              )}
             >
-              <DropdownMenuRadioItem value="normal" className="flex items-center gap-2 pr-12">
-                <ZapIcon className="w-4 h-4" />
-                Normal
-              </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="llm" className="flex items-center gap-2 pr-12">
-                <BrainIcon className="w-4 h-4" />
-                LLM
-              </DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
+              <ZapIcon className="w-4 h-4" />
+              Normal
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => setMode("llm")}
+              className={cn(
+                "flex items-center gap-2 cursor-pointer",
+                mode === "llm" && "bg-accent text-accent-foreground"
+              )}
+            >
+              <BrainIcon className="w-4 h-4" />
+              LLM
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <div className="relative w-full">
