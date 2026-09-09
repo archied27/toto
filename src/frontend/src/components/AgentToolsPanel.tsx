@@ -330,7 +330,7 @@ export default function AgentToolsPanel({
 
       <div
         className={cn(
-          "absolute bottom-0 inset-x-0 flex flex-col max-h-[75vh] rounded-t-2xl",
+          "absolute bottom-20 inset-x-0 flex flex-col max-h-[75vh] rounded-t-2xl",
           "border border-border bg-background shadow-lg",
           "transition-transform duration-300 ease-out",
           open ? "translate-y-0" : "translate-y-full"

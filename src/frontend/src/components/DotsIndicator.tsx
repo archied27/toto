@@ -60,7 +60,7 @@ export default function DotsIndicator({
         <div
             className={[
                 "fixed left-1/2 -translate-x-1/2 z-50",
-                isCommandBar ? "bottom-16" : "bottom-10",
+                "bottom-10",
             ].join(" ")}
         >
             <button

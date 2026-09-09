@@ -203,7 +203,7 @@ export default function CommandBar({
           </div>
         ) : null}
       </div>
-      <div className="pb-12 pt-10 px-4 flex items-end gap-2">
+      <div className="pb-16 pt-10 px-4 flex items-end gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button

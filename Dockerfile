@@ -29,5 +29,5 @@ COPY --from=frontend-build /app/frontend/dist /app/frontend/dist
 
 EXPOSE 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", \
-     "--ssl-keyfile", "../certs/archlinux.tail802449.ts.net.key", \
-     "--ssl-certfile", "../certs/archlinux.tail802449.ts.net.crt"]
+     "--ssl-keyfile", "../certs/archie-mini-pc.tail802449.ts.net.key", \
+     "--ssl-certfile", "../certs/archie-mini-pc.tail802449.ts.net.crt"]

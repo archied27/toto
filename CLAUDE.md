@@ -22,8 +22,8 @@ npm run preview   # Preview production build
 cd src/backend
 source .venv/bin/activate  # Uses existing venv (no uv.lock; pip install -r requirements.txt)
 uvicorn main:app --host 0.0.0.0 --port 8000 \
-  --ssl-keyfile ../certs/archlinux.tail802449.ts.net.key \
-  --ssl-certfile ../certs/archlinux.tail802449.ts.net.crt
+  --ssl-keyfile ../certs/archie-mini-pc.tail802449.ts.net.key \
+  --ssl-certfile ../certs/archie-mini-pc.tail802449.ts.net.crt
 ```
 
 ### Full Stack (uses tmux)
@@ -37,7 +37,7 @@ docker-compose up --build  # Multi-stage build: frontend → python runtime with
 ```
 
 ### Certificates
-Dev uses Tailscale certs at `certs/archlinux.tail802449.ts.net.{crt,key}` (gitignored except the files themselves). Both frontend (Vite) and backend (uvicorn) use these for HTTPS/WSS.
+Dev uses Tailscale certs at `certs/archie-mini-pc.tail802449.ts.net.{crt,key}` (gitignored except the files themselves). Both frontend (Vite) and backend (uvicorn) use these for HTTPS/WSS.
 
 ## Architecture
 
