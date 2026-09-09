@@ -50,7 +50,7 @@ import re
 import secrets
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from fastapi import WebSocket
 from pydantic import BaseModel, Field
@@ -109,12 +109,16 @@ class DeviceCapability(BaseModel):
         name: The action name (e.g., "screenshot", "list_files").
         description: Human-readable description shown to the LLM.
         parameters: OpenAI-style JSON schema for the action's parameters.
-        write: If True, the LLM must get user confirmation before dispatching.
+        action_type: The kind of action, used for UI and policy display.
+        requires_confirmation: If True, the LLM must get user confirmation.
+        write: Legacy confirmation flag retained for older agents.
     """
 
     name: str
     description: str
     parameters: dict = Field(default_factory=dict)
+    action_type: Literal["read", "open", "write"] = "read"
+    requires_confirmation: bool = False
     write: bool = False
     icon: Optional[str] = None  # Lucide icon name
     group: Optional[str] = None  # Grouping for UI display

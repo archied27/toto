@@ -23,6 +23,9 @@ export interface AgentCapability {
   name: string;
   description: string;
   parameters: Record<string, unknown>;
+  action_type?: "read" | "open" | "write";
+  requires_confirmation?: boolean;
+  /** Legacy flag retained for agents that have not migrated yet. */
   write: boolean;
   /** Lucide icon name declared by the agent; resolved client-side. */
   icon?: string | null;
@@ -85,6 +88,16 @@ type ParameterOption = { value: string; label: string };
 /** Prettify a snake_case tool name for display. */
 function prettyName(name: string) {
   return name.replace(/_/g, " ");
+}
+
+function toolNeedsConfirmation(tool: AgentCapability) {
+  return tool.requires_confirmation === true || tool.write === true;
+}
+
+function toolActionLabel(tool: AgentCapability) {
+  if (tool.action_type === "open") return "open";
+  if (tool.action_type === "write" || tool.write) return "write";
+  return "read";
 }
 
 /** Pull a human-readable line out of an arbitrary tool result payload. */
@@ -360,11 +373,12 @@ function ToolRow({
       <span className="flex-1 min-w-0">
         <span className="block text-sm font-medium capitalize leading-tight">
           {prettyName(tool.name)}
-          {tool.write && (
-            <span className="ml-2 text-[0.65rem] font-semibold uppercase tracking-wide text-amber-500 align-middle">
-              write
-            </span>
-          )}
+          <span className={cn(
+            "ml-2 text-[0.65rem] font-semibold uppercase tracking-wide align-middle",
+            toolActionLabel(tool) === "write" ? "text-amber-500" : "text-muted-foreground"
+          )}>
+              {toolActionLabel(tool)}
+          </span>
         </span>
         {tool.description && (
           <span className="block text-xs text-muted-foreground truncate">
@@ -555,7 +569,7 @@ export default function AgentToolsPanel({
       const properties = parameterSchema(tool).properties ?? {};
       if (Object.keys(properties).length > 0) {
         setParameterTool({ agent, tool });
-      } else if (tool.write) {
+      } else if (toolNeedsConfirmation(tool)) {
         setPendingWrite({ agent, tool, payload: {} });
       } else {
         runTool(agent, tool);
@@ -569,7 +583,7 @@ export default function AgentToolsPanel({
       if (!parameterTool) return;
       const { agent, tool } = parameterTool;
       setParameterTool(null);
-      if (tool.write) setPendingWrite({ agent, tool, payload });
+      if (toolNeedsConfirmation(tool)) setPendingWrite({ agent, tool, payload });
       else runTool(agent, tool, payload);
     },
     [parameterTool, runTool]

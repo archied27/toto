@@ -232,6 +232,8 @@ async def get_agents():
                         "name": cap.name,
                         "description": cap.description,
                         "parameters": cap.parameters,
+                        "action_type": cap.action_type,
+                        "requires_confirmation": cap.requires_confirmation,
                         "write": cap.write,
                         "icon": cap.icon,
                         "group": cap.group,

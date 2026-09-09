@@ -246,7 +246,13 @@ class CommandRouter:
                                 "Do not claim that it was performed."
                             )
                     # Device tool with write capability
-                    elif device_capability is not None and device_capability.write:
+                    elif (
+                        device_capability is not None
+                        and (
+                            device_capability.requires_confirmation
+                            or device_capability.write
+                        )
+                    ):
                         token = uuid.uuid4().hex
                         entry = _PendingWrite()
                         _pending_writes[token] = entry
