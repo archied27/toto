@@ -56,8 +56,8 @@ The architecture provides many useful features in which the plugins use and are 
     This provides the ability for plugins to communicate with each other. It uses a pub sub methodology, in which they can send out event messages e.g `task.created` which can have optional data, and then can also subscribe to messages, so a calendar plugin could have on `task.created` create a calendar event for it.
 
 - **Command Endpoint**
-    
-    This is where the command bar is used, where each plugin provides possible commands with examples and a description which is used by an intent classifier to select one (or none). If the confidence score is between 0.5 and the set threshold, then a confirmation is asked. A lightweight local LLM is used for data extraction. 
+
+    This is where the command bar is used. Each plugin provides possible commands via `IntentSpec`s — examples, a description, and a Pydantic slot schema. An intent classifier (sentence embeddings + cosine similarity) selects one (or none). When confidence is high enough (≥ 0.7), a lightweight local LLM (the **Extractor**) fills the intent's slot schema and the plugin handles it directly. When confidence is low, or the command is explicitly routed to the LLM, it falls back to a cloud-based **GeneralLLM** that reasons and calls plugin tools in a streaming tool loop (writes pause for user confirmation). See the [LLM architecture doc](docs/llm-architecture.md).
 
 - **Websocket Manager**
 
@@ -87,6 +87,14 @@ The architecture provides many useful features in which the plugins use and are 
 
     This is where dashboard widgets and page ordering is dynamically chosen based on each plugin's priority, and is forwarded to the frontend using the websocket. This allows for the most useful plugins' information to be more present at a certain time.
 
+- **Device Agents**
+
+    A device agent (`src/agents/`) can connect over its own websocket and is coordinated through the agent registry, enabling interaction with the physical devices it runs on.
+
+- **Deterministic Dates**
+
+    LLMs are never asked to do calendar math. Slots accept verbatim phrases ("Friday", "tomorrow") and `app/core/dates.py` converts them deterministically.
+
 ## Tech Stack
 **Backend**
 
@@ -108,6 +116,12 @@ The weather plugin provides a 14 day forecast (from open meteo) of precipitation
 ### Tasks
 The tasks plugin provides adding scheduled tasks with to do dates as well as due dates, which I find fits the way I work cleanly. It is kept minimalist to features I want, which include a list, and multiple labels, a title and a description. Each task is logged which will in future be used by an AI as context.
 
+### Media
+The media plugin controls playback through mpv and searches for movies and TV shows via TMDB, so media can be searched and played from Toto.
+
+### Web
+The web plugin provides web search (via ddgs) so the command bar and the LLM can answer questions that need up-to-date information.
+
 ## To Do
 ### Plugins
 - [ ] Calendar
@@ -115,7 +129,7 @@ The tasks plugin provides adding scheduled tasks with to do dates as well as due
 - [ ] Finance Tracker
 - [ ] Spotify Integration
 - [ ] Habits
-- [ ] Media (movies and tv shows)
+- [x] Media (movies and tv shows)
 - [ ] Sheet Music Manager (automatic downloads and progression)
 - [ ] Focus/Pomodoro
 - [ ] Recipe Tracker
@@ -124,6 +138,8 @@ The tasks plugin provides adding scheduled tasks with to do dates as well as due
 ### General
 - [ ] Push Notifications
 - [x] Intent Classifier for command bar with LLM extraction and fallback
+- [x] LLM tool calling (cloud general LLM with tool loop + write confirmation)
+- [x] Web search
 
 ### Future Upgrades
 
