@@ -8,6 +8,7 @@ import {
 import { apiFetch } from "@/hooks/api";
 import WriteConfirmDialog from "./WriteConfirmDialog";
 import { cn } from "@/lib/utils";
+import { Input } from "./ui/input";
 import {
   AGENT_FALLBACK_ICON,
   TOOL_FALLBACK_ICON,
@@ -48,6 +49,34 @@ interface ExecResponse {
 }
 
 type Feedback = { message: string; ok: boolean } | null;
+
+type ParameterSchema = {
+  type?: string;
+  title?: string;
+  description?: string;
+  default?: unknown;
+  enum?: unknown[];
+  ui?: "select" | "slider";
+  options?: unknown[];
+  options_source?: string | {
+    action: string;
+    value_key?: string;
+    label_key?: string;
+  };
+  minimum?: number;
+  maximum?: number;
+  step?: number;
+};
+
+type ToolParameters = {
+  type?: string;
+  properties?: Record<string, ParameterSchema>;
+  required?: string[];
+};
+
+type ToolPayload = Record<string, unknown>;
+
+type ParameterOption = { value: string; label: string };
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -92,6 +121,214 @@ function groupCapabilities(caps: AgentCapability[]): {
   }
   const groups = [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   return { ungrouped, groups };
+}
+
+function parameterSchema(tool: AgentCapability): ToolParameters {
+  const parameters = tool.parameters as ToolParameters;
+  return parameters && typeof parameters === "object" ? parameters : {};
+}
+
+function initialParameterValues(tool: AgentCapability): Record<string, string | boolean> {
+  const values: Record<string, string | boolean> = {};
+  for (const [name, schema] of Object.entries(parameterSchema(tool).properties ?? {})) {
+    if (schema.default !== undefined) {
+      values[name] = typeof schema.default === "boolean" ? schema.default : String(schema.default);
+    } else if (schema.type === "boolean") {
+      values[name] = false;
+    } else if (schema.ui === "slider") {
+      values[name] = String(schema.minimum ?? 0);
+    } else {
+      values[name] = "";
+    }
+  }
+  return values;
+}
+
+function parseParameterValue(value: string | boolean, schema: ParameterSchema): unknown {
+  if (schema.type === "boolean") return value === true || value === "true";
+  if (value === "") return undefined;
+  if (schema.type === "number" || schema.type === "integer" || schema.ui === "slider") {
+    return schema.type === "integer" ? Number.parseInt(String(value), 10) : Number(value);
+  }
+  if (schema.type === "array" || schema.type === "object") {
+    try {
+      return JSON.parse(String(value));
+    } catch {
+      return value;
+    }
+  }
+  return value;
+}
+
+function toParameterOptions(options: unknown[], schema: ParameterSchema): ParameterOption[] {
+  const source = schema.options_source;
+  const valueKey = typeof source === "object" ? source.value_key : undefined;
+  const labelKey = typeof source === "object" ? source.label_key : undefined;
+  return options.flatMap((option) => {
+    if (option && typeof option === "object") {
+      const record = option as Record<string, unknown>;
+      const value = valueKey ? record[valueKey] : record.value;
+      const label = labelKey ? record[labelKey] : record.label ?? value;
+      if (value !== undefined && label !== undefined) {
+        return [{ value: String(value), label: String(label) }];
+      }
+    }
+    return [{ value: String(option), label: String(option) }];
+  });
+}
+
+function extractOptions(result: unknown): unknown[] {
+  if (Array.isArray(result)) return result;
+  if (result && typeof result === "object") {
+    const record = result as Record<string, unknown>;
+    for (const key of ["options", "items", "applications"]) {
+      if (Array.isArray(record[key])) return record[key];
+    }
+  }
+  return [];
+}
+
+function ToolParameterForm({
+  agent,
+  tool,
+  onSubmit,
+  onCancel,
+}: {
+  agent: Agent;
+  tool: AgentCapability;
+  onSubmit: (payload: ToolPayload) => void;
+  onCancel: () => void;
+}) {
+  const schema = parameterSchema(tool);
+  const properties = Object.entries(schema.properties ?? {});
+  const required = new Set(schema.required ?? []);
+  const [values, setValues] = useState(() => initialParameterValues(tool));
+  const [dynamicOptions, setDynamicOptions] = useState<Record<string, ParameterOption[]>>({});
+  const [loadingOptions, setLoadingOptions] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadOptions = async (name: string, property: ParameterSchema) => {
+      if (!property.options_source) return;
+      const source = property.options_source;
+      const action = typeof source === "string" ? source : source.action;
+      setLoadingOptions((current) => ({ ...current, [name]: true }));
+      try {
+        const response = await apiFetch<ExecResponse>(
+          `/agents/${encodeURIComponent(agent.device_id)}/${encodeURIComponent(action)}`,
+          { method: "POST", body: JSON.stringify({ payload: {} }) }
+        );
+        if (!cancelled) {
+          setDynamicOptions((current) => ({
+            ...current,
+            [name]: toParameterOptions(extractOptions(response.result), property),
+          }));
+        }
+      } catch (loadError) {
+        console.error(`Failed to load options for ${name}:`, loadError);
+      } finally {
+        if (!cancelled) setLoadingOptions((current) => ({ ...current, [name]: false }));
+      }
+    };
+
+    for (const [name, property] of Object.entries(schema.properties ?? {})) {
+      void loadOptions(name, property);
+    }
+    return () => { cancelled = true; };
+  }, [agent.device_id, tool]);
+
+  const submit = () => {
+    const payload: ToolPayload = {};
+    for (const [name, property] of properties) {
+      const rawValue = values[name] ?? "";
+      if (required.has(name) && rawValue === "") {
+        setError(`${property.title || name} is required`);
+        return;
+      }
+      const parsed = parseParameterValue(rawValue, property);
+      if (parsed !== undefined) payload[name] = parsed;
+    }
+    setError(null);
+    onSubmit(payload);
+  };
+
+  return (
+    <div className="flex flex-col gap-4 px-4 pb-6">
+      <div>
+        <p className="text-sm font-semibold">{prettyName(tool.name)}</p>
+        {tool.description && <p className="mt-1 text-xs text-muted-foreground">{tool.description}</p>}
+      </div>
+
+      {properties.length === 0 ? (
+        <p className="text-sm text-muted-foreground">This tool has no parameters.</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {properties.map(([name, property]) => {
+            const label = property.title || name.replace(/_/g, " ");
+            const value = values[name] ?? "";
+            const options = property.options_source
+              ? dynamicOptions[name] ?? []
+              : toParameterOptions(property.options ?? property.enum ?? [], property);
+            const isSelect = property.ui === "select" || property.options_source || property.options || property.enum;
+            const isSlider = property.ui === "slider";
+            return (
+              <label key={name} className="flex flex-col gap-1.5 text-sm">
+                <span className="font-medium capitalize">
+                  {label}{required.has(name) && <span className="ml-1 text-destructive">*</span>}
+                </span>
+                {isSelect ? (
+                  <select
+                    value={String(value)}
+                    onChange={(event) => setValues((current) => ({ ...current, [name]: event.target.value }))}
+                    className="h-9 w-full rounded-md border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                    disabled={loadingOptions[name]}
+                  >
+                    <option value="">{loadingOptions[name] ? "Loading..." : "Select..."}</option>
+                    {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                ) : isSlider ? (
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={property.minimum ?? 0}
+                      max={property.maximum ?? 100}
+                      step={property.step ?? 1}
+                      value={String(value || property.minimum || 0)}
+                      onChange={(event) => setValues((current) => ({ ...current, [name]: event.target.value }))}
+                      className="min-w-0 flex-1 accent-primary"
+                    />
+                    <span className="w-12 text-right text-xs tabular-nums text-muted-foreground">{String(value || property.minimum || 0)}</span>
+                  </div>
+                ) : property.type === "boolean" ? (
+                  <input
+                    type="checkbox"
+                    checked={value === true}
+                    onChange={(event) => setValues((current) => ({ ...current, [name]: event.target.checked }))}
+                    className="h-4 w-4 accent-primary"
+                  />
+                ) : (
+                  <Input
+                    type={property.type === "number" || property.type === "integer" ? "number" : "text"}
+                    value={String(value)}
+                    placeholder={property.type === "array" || property.type === "object" ? "JSON value" : undefined}
+                    onChange={(event) => setValues((current) => ({ ...current, [name]: event.target.value }))}
+                  />
+                )}
+                {property.description && <span className="text-xs text-muted-foreground">{property.description}</span>}
+              </label>
+            );
+          })}
+        </div>
+      )}
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onCancel} className="rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted">Cancel</button>
+        <button type="button" onClick={submit} className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground hover:bg-primary/90">Continue</button>
+      </div>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -249,9 +486,14 @@ export default function AgentToolsPanel({
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(false);
   const [runningKey, setRunningKey] = useState<string | null>(null);
+  const [parameterTool, setParameterTool] = useState<{
+    agent: Agent;
+    tool: AgentCapability;
+  } | null>(null);
   const [pendingWrite, setPendingWrite] = useState<{
     agent: Agent;
     tool: AgentCapability;
+    payload: ToolPayload;
   } | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<
@@ -284,14 +526,14 @@ export default function AgentToolsPanel({
   }, []);
 
   const runTool = useCallback(
-    async (agent: Agent, tool: AgentCapability) => {
+    async (agent: Agent, tool: AgentCapability, payload: ToolPayload = {}) => {
       const key = `${agent.device_id}/${tool.name}`;
       setRunningKey(key);
       setFeedback(null);
       try {
         const res = await apiFetch<ExecResponse>(
           `/agents/${agent.device_id}/${tool.name}`,
-          { method: "POST", body: JSON.stringify({ payload: {} }) }
+          { method: "POST", body: JSON.stringify({ payload }) }
         );
         setFeedback({ message: describeResult(res.result), ok: res.success });
       } catch (err) {
@@ -310,11 +552,27 @@ export default function AgentToolsPanel({
   const handleToolClick = useCallback(
     (agent: Agent, tool: AgentCapability) => {
       if (runningKey) return;
-      // Mirror the LLM write-gate: writes need explicit confirmation.
-      if (tool.write) setPendingWrite({ agent, tool });
-      else runTool(agent, tool);
+      const properties = parameterSchema(tool).properties ?? {};
+      if (Object.keys(properties).length > 0) {
+        setParameterTool({ agent, tool });
+      } else if (tool.write) {
+        setPendingWrite({ agent, tool, payload: {} });
+      } else {
+        runTool(agent, tool);
+      }
     },
     [runningKey, runTool]
+  );
+
+  const handleParameters = useCallback(
+    (payload: ToolPayload) => {
+      if (!parameterTool) return;
+      const { agent, tool } = parameterTool;
+      setParameterTool(null);
+      if (tool.write) setPendingWrite({ agent, tool, payload });
+      else runTool(agent, tool, payload);
+    },
+    [parameterTool, runTool]
   );
 
   return (
@@ -364,17 +622,24 @@ export default function AgentToolsPanel({
 
         {/* A pending write confirmation replaces the list so the dialog
             isn't buried under it (same pattern as CommandBar). */}
-        {pendingWrite ? (
+        {parameterTool ? (
+          <ToolParameterForm
+            agent={parameterTool.agent}
+            tool={parameterTool.tool}
+            onSubmit={handleParameters}
+            onCancel={() => setParameterTool(null)}
+          />
+        ) : pendingWrite ? (
           <div className="px-4 pb-6">
             <WriteConfirmDialog
               title={
                 pendingWrite.tool.description || prettyName(pendingWrite.tool.name)
               }
-              args={{}}
+              args={pendingWrite.payload}
               onConfirm={() => {
-                const { agent, tool } = pendingWrite;
+                const { agent, tool, payload } = pendingWrite;
                 setPendingWrite(null);
-                runTool(agent, tool);
+                runTool(agent, tool, payload);
               }}
               onCancel={() => setPendingWrite(null)}
             />
