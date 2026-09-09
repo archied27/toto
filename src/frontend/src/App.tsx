@@ -4,6 +4,7 @@ import DotsIndicator from './components/DotsIndicator'
 import { WebSocketProvider } from './hooks/WebSocketContext'
 import { NavigationProvider, useNavigation } from './hooks/NavigationContext'
 import CommandBar from './components/CommandBar'
+import AgentToolsPanel from './components/AgentToolsPanel'
 import { usePages } from './hooks/usePages'
 import { pageRegistry, type AppPage } from './hooks/pageRegistry'
 import { type WidgetSlot, resolveSlot } from './dashboard/DashboardPage'
@@ -20,21 +21,47 @@ function AppInner({ pages }: { pages: AppPage[] }) {
   }, [slots]);
 
   const [isCommandBar, setIsCommandBar] = useState(false)
+  const [isAgentTools, setIsAgentTools] = useState(false)
   const pageIds = pages.map(page => page.id)
+
+  // Only one overlay open at a time
+  const openCommandBar = () => {
+    setIsAgentTools(false)
+    setIsCommandBar(prev => !prev)
+  }
+
+  const openAgentTools = () => {
+    setIsCommandBar(false)
+    setIsAgentTools(true)
+  }
+
+  const anyOverlayOpen = isCommandBar || isAgentTools
 
   return (
     <div className="dark h-full bg-background flex flex-col">
-      {isCommandBar && <CommandBar onClose={() => setIsCommandBar(false)} longComponent={longSlot?.component} />}
-      <div className={`flex-1 min-h-0 transition-all duration-300 ease-in-out 
-        ${isCommandBar ? 'blur-sm brightness-50 pointer-events-none select-none' : ''}`}>
+      {isCommandBar && (
+        <CommandBar onClose={() => setIsCommandBar(false)} longComponent={longSlot?.component} />
+      )}
+      {isAgentTools && (
+        <AgentToolsPanel onClose={() => setIsAgentTools(false)} open={false} />
+      )}
+      <div
+        className={`flex-1 min-h-0 transition-all duration-300 ease-in-out 
+        ${anyOverlayOpen ? 'blur-sm brightness-50 pointer-events-none select-none' : ''}`}
+      >
         <SwipeNavigator
           pages={pages}
           currentIndex={currentIndex}
           onPageChange={(index) => navigate(pageIds[index])}
         />
       </div>
-      <DotsIndicator currentIndex={currentIndex} total={pages.length} onClick={() => setIsCommandBar(prev => !prev)} 
-        isCommandBar={isCommandBar} />
+      <DotsIndicator
+        currentIndex={currentIndex}
+        total={pages.length}
+        isCommandBar={isCommandBar}
+        onClick={openCommandBar}
+        onSwipeUp={openAgentTools}
+      />
     </div>
   )
 }

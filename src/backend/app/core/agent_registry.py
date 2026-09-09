@@ -116,6 +116,8 @@ class DeviceCapability(BaseModel):
     description: str
     parameters: dict = Field(default_factory=dict)
     write: bool = False
+    icon: Optional[str] = None  # Lucide icon name
+    group: Optional[str] = None  # Grouping for UI display
 
 
 class ConnectedDevice(BaseModel):
@@ -125,12 +127,16 @@ class ConnectedDevice(BaseModel):
     Attributes:
         device_id: Unique identifier for the device.
         websocket: The FastAPI WebSocket connection (excluded from serialization).
+        display_name: The user-friendly name for the device.
+        icon: Lucide icon name for the device (optional).
         capabilities: List of capabilities this device exposes.
         connected_at: Timestamp when the device connected.
     """
 
     device_id: str
     websocket: Any = Field(exclude=True)
+    display_name: Optional[str] = None
+    icon: Optional[str] = None
     capabilities: list[DeviceCapability] = Field(default_factory=list)
     connected_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -165,6 +171,8 @@ class AgentRegistry:
         self,
         device_id: str,
         websocket: WebSocket,
+        display_name: Optional[str],
+        icon: Optional[str],
         capabilities: list[DeviceCapability],
     ) -> None:
         """
@@ -185,6 +193,8 @@ class AgentRegistry:
         device = ConnectedDevice(
             device_id=device_id,
             websocket=websocket,
+            display_name=display_name,
+            icon=icon,
             capabilities=capabilities,
             connected_at=datetime.utcnow(),
         )

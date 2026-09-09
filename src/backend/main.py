@@ -209,6 +209,50 @@ async def agent_websocket_endpoint(websocket: WebSocket):
         os.getenv("AGENT_SHARED_SECRET", "")
     )
 
+
+# GET /agents - List connected agents and their capabilities
+@app.get("/agents")
+async def get_agents():
+    registry = app.state.agent_registry
+    return {
+        "agents": [
+            {
+                "device_id": device_id,
+                "display_name": device.display_name,
+                "icon": device.icon,
+                "connected_at": device.connected_at.isoformat(),
+                "capabilities": [
+                    {
+                        "name": cap.name,
+                        "description": cap.description,
+                        "parameters": cap.parameters,
+                        "write": cap.write,
+                        "icon": cap.icon,
+                        "group": cap.group,
+                    }
+                    for cap in device.capabilities
+                ]
+            }
+            for device_id, device in registry._devices.items()
+        ]
+    }
+
+# POST /agents/{device_id}/{action} - Execute agent tool directly
+@app.post("/agents/{device_id}/{action}")
+async def execute_agent_tool(device_id: str, action: str, req: dict):
+    registry = app.state.agent_registry
+    payload = req.get("payload", {})
+    try:
+        result = await registry.dispatch(device_id, action, payload)
+        return {"success": True, "result": result}
+    except DeviceNotConnectedError:
+        raise HTTPException(404, f"Device '{device_id}' not connected")
+    except DeviceTimeoutError:
+        raise HTTPException(504, f"Device '{device_id}' timeout")
+    except DeviceDisconnectedError:
+        raise HTTPException(503, f"Device '{device_id}' disconnected")
+
+
 # Static files - order matters, all before the catch-all
 @app.get("/manifest.json")
 async def manifest():
