@@ -24,18 +24,23 @@ function AppInner({ pages }: { pages: AppPage[] }) {
   const [isAgentTools, setIsAgentTools] = useState(false)
   const pageIds = pages.map(page => page.id)
 
-  // Only one overlay open at a time
-  const openCommandBar = () => {
-    setIsAgentTools(false)
+  const anyOverlayOpen = isCommandBar || isAgentTools
+
+  // Tap: open CommandBar if nothing's open, otherwise close whatever IS open
+  const handleTap = () => {
+    if (isAgentTools) {
+      setIsAgentTools(false)
+      return
+    }
     setIsCommandBar(prev => !prev)
   }
 
-  const openAgentTools = () => {
+  // Swipe up: open AgentToolsPanel (closing CommandBar if it was open)
+  const handleSwipeUp = () => {
+    if (isAgentTools) return // already open, nothing to do
     setIsCommandBar(false)
     setIsAgentTools(true)
   }
-
-  const anyOverlayOpen = isCommandBar || isAgentTools
 
   return (
     <div className="dark h-full bg-background flex flex-col">
@@ -43,7 +48,7 @@ function AppInner({ pages }: { pages: AppPage[] }) {
         <CommandBar onClose={() => setIsCommandBar(false)} longComponent={longSlot?.component} />
       )}
       {isAgentTools && (
-        <AgentToolsPanel onClose={() => setIsAgentTools(false)} open={false} />
+        <AgentToolsPanel onClose={() => setIsAgentTools(false)} open={isAgentTools} />
       )}
       <div
         className={`flex-1 min-h-0 transition-all duration-300 ease-in-out 
@@ -58,9 +63,9 @@ function AppInner({ pages }: { pages: AppPage[] }) {
       <DotsIndicator
         currentIndex={currentIndex}
         total={pages.length}
-        isCommandBar={isCommandBar}
-        onClick={openCommandBar}
-        onSwipeUp={openAgentTools}
+        isCommandBar={anyOverlayOpen}
+        onClick={handleTap}
+        onSwipeUp={handleSwipeUp}
       />
     </div>
   )

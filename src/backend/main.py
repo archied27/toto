@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 import asyncio
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -16,7 +16,13 @@ from app.services.pages.pages_service import PageService
 from app.db.manager import DBManager
 from app.core.core import Core
 from app.core.command import router as CommandRouter, resolve_write
-from app.core.agent_registry import AgentRegistry, handle_agent_connection
+from app.core.agent_registry import (
+    AgentRegistry,
+    handle_agent_connection,
+    DeviceNotConnectedError,
+    DeviceTimeoutError,
+    DeviceDisconnectedError,
+)
 import json
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
