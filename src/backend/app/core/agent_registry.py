@@ -460,6 +460,8 @@ async def handle_agent_connection(
 
         device_id = msg.get("device")
         token = msg.get("token", "")
+        display_name = msg.get("display_name")
+        icon = msg.get("icon")
         capabilities_data = msg.get("capabilities", [])
 
         # Validate token (fail closed)
@@ -484,7 +486,13 @@ async def handle_agent_connection(
                 )
 
         # Register the device
-        agent_registry.register(device_id, websocket, capabilities)
+        agent_registry.register(
+            device_id,
+            websocket,
+            display_name,
+            icon,
+            capabilities,
+        )
 
         # Main receive loop
         while True:
