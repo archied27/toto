@@ -320,13 +320,13 @@ export default function AgentToolsPanel({
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 transition-opacity duration-300 ease-out",
+        "fixed inset-0 z-50 flex flex-col justify-between pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] transition-opacity duration-300 ease-in-out",
         open ? "opacity-100" : "opacity-0 pointer-events-none"
       )}
       aria-hidden={!open}
     >
       {/* Backdrop — tap to dismiss */}
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-0" onClick={onClose} />
 
       <div
         className={cn(
