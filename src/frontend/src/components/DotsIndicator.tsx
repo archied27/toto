@@ -57,7 +57,12 @@ export default function DotsIndicator({
     };
 
     return (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50">
+        <div
+            className={[
+                "fixed left-1/2 -translate-x-1/2 z-50",
+                isCommandBar ? "bottom-16" : "bottom-10",
+            ].join(" ")}
+        >
             <button
                 type="button"
                 onClick={onClick} // still works for mouse/desktop clicks
