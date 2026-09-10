@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ChevronDownIcon,
+  ChevronsDownIcon,
+  ChevronsUpIcon,
   LoaderCircleIcon,
   RefreshCwIcon,
-  XIcon,
 } from "lucide-react";
 import { apiFetch } from "@/hooks/api";
 import WriteConfirmDialog from "./WriteConfirmDialog";
@@ -441,7 +442,7 @@ function AgentCard({
       {/* Group folders */}
       {groups.map(([group, tools]) => {
         const key = `${agent.device_id}:${group}`;
-        const collapsed = collapsedGroups[key] ?? false;
+        const collapsed = collapsedGroups[key] ?? true;
         return (
           <div key={key} className="flex flex-col">
             <button
@@ -536,8 +537,38 @@ export default function AgentToolsPanel({
   }, [open, fetchAgents]);
 
   const toggleGroup = useCallback((key: string) => {
-    setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
+    setCollapsedGroups((prev) => ({
+      ...prev,
+      [key]: !(prev[key] ?? true),
+    }));
   }, []);
+
+  const groupKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const agent of agents) {
+      for (const capability of agent.capabilities) {
+        if (capability.group) {
+          keys.add(`${agent.device_id}:${capability.group}`);
+        }
+      }
+    }
+    return [...keys];
+  }, [agents]);
+
+  const allGroupsOpen =
+    groupKeys.length > 0 &&
+    groupKeys.every((key) => collapsedGroups[key] === false);
+
+  const toggleAllGroups = useCallback(() => {
+    const nextCollapsed = allGroupsOpen;
+    setCollapsedGroups((previous) => {
+      const next = { ...previous };
+      for (const key of groupKeys) {
+        next[key] = nextCollapsed;
+      }
+      return next;
+    });
+  }, [allGroupsOpen, groupKeys]);
 
   const runTool = useCallback(
     async (agent: Agent, tool: AgentCapability, payload: ToolPayload = {}) => {
@@ -625,11 +656,15 @@ export default function AgentToolsPanel({
             </button>
             <button
               type="button"
-              aria-label="Close panel"
-              onClick={onClose}
+              aria-label={allGroupsOpen ? "Collapse all folders" : "Expand all folders"}
+              onClick={toggleAllGroups}
               className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
-              <XIcon className="w-4 h-4" />
+              {allGroupsOpen ? (
+                <ChevronsUpIcon className="w-4 h-4" />
+              ) : (
+                <ChevronsDownIcon className="w-4 h-4" />
+              )}
             </button>
           </div>
         </div>
