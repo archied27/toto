@@ -143,12 +143,6 @@ The web plugin provides web search (via ddgs) so the command bar and the LLM can
 
 ### Future Upgrades
 
-**Centralised AI**
-
-I would like, to after more plugins and more data is collected, add an AI which uses a specialised context (productivity_score, weather, etc) to automate more and to provide more personalised features which no other application can provide.
-
-This could provide a daily overview as well.
-
 **Embedded Systems**
 
 I would like in the future to include embedded systems into this which would integrate a more physical interaction with it.

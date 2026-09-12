@@ -108,6 +108,10 @@ function describeResult(result: unknown): string {
   if (typeof result === "object") {
     const r = result as Record<string, unknown>;
     if (typeof r.message === "string") return r.message;
+    if (typeof r.volume === "number") return `Volume: ${r.volume}%`;
+    if (Array.isArray(r.options)) return `${r.options.length} application${r.options.length === 1 ? "" : "s"} found`;
+    if (Array.isArray(r.items)) return `${r.items.length} item${r.items.length === 1 ? "" : "s"} found`;
+    if (Array.isArray(r.applications)) return `${r.applications.length} application${r.applications.length === 1 ? "" : "s"} found`;
     if (typeof r.status === "string") return r.status;
   }
   try {
@@ -222,6 +226,11 @@ function ToolParameterForm({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setValues(initialParameterValues(tool));
+    setError(null);
+    setDynamicOptions({});
+    setLoadingOptions({});
+
     let cancelled = false;
     const loadOptions = async (name: string, property: ParameterSchema) => {
       if (!property.options_source) return;
@@ -246,9 +255,32 @@ function ToolParameterForm({
       }
     };
 
+    const loadSliderDefaults = async () => {
+      for (const [name, property] of Object.entries(schema.properties ?? {})) {
+        if (property.ui !== "slider" || property.default !== undefined) continue;
+        if (tool.name !== "set_volume" || name !== "volume") continue;
+
+        try {
+          const response = await apiFetch<ExecResponse>(
+            `/agents/${encodeURIComponent(agent.device_id)}/get_volume`,
+            { method: "POST", body: JSON.stringify({ payload: {} }) }
+          );
+          const volume = response.result && typeof response.result === "object"
+            ? (response.result as Record<string, unknown>).volume
+            : undefined;
+          if (!cancelled && typeof volume === "number") {
+            setValues((current) => ({ ...current, [name]: String(volume) }));
+          }
+        } catch (loadError) {
+          console.error(`Failed to load default value for ${name}:`, loadError);
+        }
+      }
+    };
+
     for (const [name, property] of Object.entries(schema.properties ?? {})) {
       void loadOptions(name, property);
     }
+    void loadSliderDefaults();
     return () => { cancelled = true; };
   }, [agent.device_id, tool]);
 
