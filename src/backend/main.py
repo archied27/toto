@@ -225,6 +225,7 @@ async def get_agents():
             {
                 "device_id": device_id,
                 "display_name": device.display_name,
+                "description": device.description,
                 "icon": device.icon,
                 "connected_at": device.connected_at.isoformat(),
                 "capabilities": [

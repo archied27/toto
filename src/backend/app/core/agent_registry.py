@@ -132,6 +132,7 @@ class ConnectedDevice(BaseModel):
         device_id: Unique identifier for the device.
         websocket: The FastAPI WebSocket connection (excluded from serialization).
         display_name: The user-friendly name for the device.
+        description: Short guidance describing this device and when to use it.
         icon: Lucide icon name for the device (optional).
         capabilities: List of capabilities this device exposes.
         connected_at: Timestamp when the device connected.
@@ -140,6 +141,7 @@ class ConnectedDevice(BaseModel):
     device_id: str
     websocket: Any = Field(exclude=True)
     display_name: Optional[str] = None
+    description: Optional[str] = None
     icon: Optional[str] = None
     capabilities: list[DeviceCapability] = Field(default_factory=list)
     connected_at: datetime = Field(default_factory=datetime.utcnow)
@@ -178,6 +180,7 @@ class AgentRegistry:
         display_name: Optional[str],
         icon: Optional[str],
         capabilities: list[DeviceCapability],
+        description: Optional[str] = None,
     ) -> None:
         """
         Register a connected device.
@@ -198,6 +201,7 @@ class AgentRegistry:
             device_id=device_id,
             websocket=websocket,
             display_name=display_name,
+            description=description,
             icon=icon,
             capabilities=capabilities,
             connected_at=datetime.utcnow(),
@@ -408,7 +412,12 @@ class AgentRegistry:
                     "type": "function",
                     "function": {
                         "name": tool_name,
-                        "description": f"[{device_id}] {cap.description}",
+                        "description": (
+                            f"[{device.display_name or device_id} - "
+                            f"{device.description}] {cap.description}"
+                            if device.description
+                            else f"[{device.display_name or device_id}] {cap.description}"
+                        ),
                         "parameters": cap.parameters,
                     },
                 }
@@ -465,6 +474,7 @@ async def handle_agent_connection(
         device_id = msg.get("device")
         token = msg.get("token", "")
         display_name = msg.get("display_name")
+        description = msg.get("description")
         icon = msg.get("icon")
         capabilities_data = msg.get("capabilities", [])
 
@@ -496,6 +506,7 @@ async def handle_agent_connection(
             display_name,
             icon,
             capabilities,
+            description=description,
         )
 
         # Main receive loop

@@ -37,6 +37,7 @@ export interface AgentCapability {
 export interface Agent {
   device_id: string;
   display_name?: string | null;
+  description?: string | null;
   /** Lucide icon name declared by the agent; resolved client-side. */
   icon?: string | null;
   connected_at: string;
@@ -460,6 +461,11 @@ function AgentCard({
           {agent.display_name || agent.device_id}
         </span>
       </div>
+      {agent.description && (
+        <p className="px-1 text-xs text-muted-foreground">
+          {agent.description}
+        </p>
+      )}
 
       {/* Ungrouped tools sit directly in the card, above the folders */}
       {ungrouped.map((tool) => (
