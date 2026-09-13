@@ -6,7 +6,7 @@ Toto is a personal home assistant driven by an event-focused architecture. It ho
 ## Demo
 This is a short demo showcasing Toto's current state
 
-<img src="/docs/Toto-Demo.gif" height="250"/>
+<img src="/docs/Toto-Demo.gif" height="750"/>
 
 ## Features
 The architecture provides many useful features in which the plugins use and are used to manage plugins
