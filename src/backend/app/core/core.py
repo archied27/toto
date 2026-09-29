@@ -10,9 +10,11 @@ from app.core.state import AppState
 
 class Core:
     def __init__(self, event_bus: EventBus, bg_worker: BackgroundWorker, 
-                scheduler: Scheduler, db_manager: DBManager, state: AppState):
+                scheduler: Scheduler, db_manager: DBManager, state: AppState,
+                agents=None):
         self.bus = event_bus
         self.bg_worker = bg_worker
         self.scheduler = scheduler
         self.db_manager = db_manager
         self.state = state
+        self.agents = agents

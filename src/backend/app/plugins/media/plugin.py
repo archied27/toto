@@ -1,11 +1,11 @@
 from app.schemas.base_plugin import BasePlugin
-from app.plugins.media.routes import MPVRouter
-from app.plugins.media.controller.controller import MPVController
+from app.plugins.media.routes import MediaRouter
+from app.plugins.media.controller.media_controller import MediaController
 
-class MPVPlugin(BasePlugin):
+class MediaPlugin(BasePlugin):
     async def setup(self, core):
-        self.controller = MPVController(core)
-        self.router = MPVRouter(self.controller)
+        self.controller = MediaController(core)
+        self.router = MediaRouter(self.controller)
         
         await self.controller.setup()
 
@@ -25,4 +25,4 @@ class MPVPlugin(BasePlugin):
         pass
 
     def get_name(self):
-        return "mpv"
+        return "media"

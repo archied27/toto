@@ -62,7 +62,7 @@ export function useSearch() {
     const search = useCallback(async (query: string, mediaType: "all" | "movie" | "tv" = "all"): Promise<HomePageResult[]> => {
         setLoading(true);
         try {
-            const data = await apiFetch(`/mpv/search?query=${query}&media_type=${mediaType}`, {
+            const data = await apiFetch(`/media/search?query=${encodeURIComponent(query)}&media_type=${mediaType}`, {
                 method: "GET",
             });
             return Array.isArray(data) ? data : [];
@@ -83,7 +83,7 @@ export function useGetMovieDetails(movieId: number) {
     const getMovieDetails = useCallback(async (): Promise<MovieDetails | null> => {
         setLoading(true);
         try {
-            const data = await apiFetch(`/mpv/movie_details/${movieId}`, {
+            const data = await apiFetch(`/media/items/movie/${movieId}`, {
                 method: "GET",
             });
             return data ? (data as MovieDetails) : null;
@@ -104,7 +104,7 @@ export function useGetSeriesDetails(seriesId: number) {
     const getSeriesDetails = useCallback(async (): Promise<FullSeriesDetails | null> => {
         setLoading(true);
         try {
-            const data = await apiFetch(`/mpv/full_series_details/${seriesId}`, {
+            const data = await apiFetch(`/media/items/series/${seriesId}`, {
                 method: "GET",
             });
             console.log("Fetched series details:", data);

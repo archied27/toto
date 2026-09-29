@@ -144,6 +144,7 @@ class ConnectedDevice(BaseModel):
     description: Optional[str] = None
     icon: Optional[str] = None
     capabilities: list[DeviceCapability] = Field(default_factory=list)
+    media_capability: Optional[dict[str, Any]] = None
     connected_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -167,6 +168,8 @@ class AgentRegistry:
     def __init__(self):
         self._devices: dict[str, ConnectedDevice] = {}
         self._pending: dict[str, tuple[str, asyncio.Future]] = {}
+        self._media_connected_handler = None
+        self._media_disconnected_handler = None
         # request_id -> (device_id, future)
 
     # -----------------------------------------------------------------------
@@ -181,6 +184,7 @@ class AgentRegistry:
         icon: Optional[str],
         capabilities: list[DeviceCapability],
         description: Optional[str] = None,
+        media_capability: Optional[dict[str, Any]] = None,
     ) -> None:
         """
         Register a connected device.
@@ -204,9 +208,12 @@ class AgentRegistry:
             description=description,
             icon=icon,
             capabilities=capabilities,
+            media_capability=media_capability,
             connected_at=datetime.utcnow(),
         )
         self._devices[device_id] = device
+        if media_capability and self._media_connected_handler:
+            asyncio.create_task(self._media_connected_handler(device_id))
         logger.info(
             "Device '%s' registered with %d capabilities",
             device_id,
@@ -239,7 +246,14 @@ class AgentRegistry:
 
         self._devices.pop(device_id, None)
         self._fail_pending_futures(device_id, DeviceDisconnectedError(device_id))
+        if device.media_capability and self._media_disconnected_handler:
+            asyncio.create_task(self._media_disconnected_handler(device_id))
         logger.info("Device '%s' unregistered", device_id)
+
+    def set_media_lifecycle_handlers(self, on_connected, on_disconnected) -> None:
+        """Register media inventory reconciliation callbacks."""
+        self._media_connected_handler = on_connected
+        self._media_disconnected_handler = on_disconnected
 
     def _fail_pending_futures(self, device_id: str, error: Exception) -> None:
         """Fail all pending futures owned by a device."""
@@ -267,6 +281,10 @@ class AgentRegistry:
     def list_connected(self) -> list[str]:
         """List all connected device IDs."""
         return list(self._devices.keys())
+
+    def list_media_agents(self) -> list[ConnectedDevice]:
+        """Return connected devices that advertise the typed media capability."""
+        return [device for device in self._devices.values() if device.media_capability]
 
     def get_capability(
         self, device_id: str, action: str
@@ -477,6 +495,7 @@ async def handle_agent_connection(
         description = msg.get("description")
         icon = msg.get("icon")
         capabilities_data = msg.get("capabilities", [])
+        media_capability = msg.get("media_capability")
 
         # Validate token (fail closed)
         if not shared_secret or not secrets.compare_digest(token, shared_secret):
@@ -507,6 +526,7 @@ async def handle_agent_connection(
             icon,
             capabilities,
             description=description,
+            media_capability=media_capability,
         )
 
         # Main receive loop

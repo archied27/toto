@@ -43,7 +43,8 @@ async def lifespan(app: FastAPI):
     # backend from src/backend); docker-compose overrides this to /app/data
     db_path = os.getenv("TOTO_DB_PATH", "../data/toto.db")
     db_manager = DBManager(db_path)
-    core = Core(event_bus, bg_worker, scheduler, db_manager, state)
+    agent_registry = AgentRegistry()
+    core = Core(event_bus, bg_worker, scheduler, db_manager, state, agent_registry)
 
     await ws_manager.forward("dashboard.changed")
     await ws_manager.forward("pages.changed")
@@ -54,7 +55,6 @@ async def lifespan(app: FastAPI):
     await plugin_manager.register_plugins()
 
     # Agent registry for device-agent coordination
-    agent_registry = AgentRegistry()
     CommandRouter.set_agent_registry(agent_registry)
 
     @app.get("/{full_path:path}")
