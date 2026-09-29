@@ -76,7 +76,7 @@ class DailyProgress(BaseModel):
 
 class HabitsState(BaseModel):
     dashboard_priority: int = 0
-    page_priority: int = 15
+    page_priority: int = 25
     base_priority: int = 50
     active_habits: int = 0
     due_today: int = 0

@@ -158,12 +158,12 @@ class HabitsController:
         habits = await self.db_controller.get_habits()
         today = date.today()
         summaries = [await self._summary(habit, today) for habit in habits]
-        due = sum(summary.status in ("due", "missed") for summary in summaries)
+        due = sum(summary.status == "due" for summary in summaries)
         completed = sum(summary.status == "completed" for summary in summaries)
         missed = sum(summary.status == "missed" for summary in summaries)
         state = HabitsState(
-            dashboard_priority=min(100, due * 30 + missed * 20),
-            page_priority=30,
+            dashboard_priority=min(100, due * 30),
+            page_priority=max(25, min(100, due * 10)),
             active_habits=len(habits),
             due_today=due,
             completed_today=completed,
@@ -242,6 +242,13 @@ class HabitsController:
         await self.update_state()
         return await self.db_controller.get_habit(habit_id)
 
+    async def delete_habit(self, habit_id: int):
+        habit = await self.db_controller.get_habit(habit_id)
+        if not habit:
+            raise LookupError("Habit not found")
+        await self.db_controller.delete_habit(habit_id)
+        await self.update_state()
+
     async def complete(self, habit_id: int, occurrence_date: str | None, source: str):
         habit = await self.db_controller.get_habit(habit_id)
         if not habit:
@@ -266,6 +273,12 @@ class HabitsController:
 
     async def get_today(self) -> list[HabitSummary]:
         return (await self.get_state()).today
+
+    async def get_day(self, selected_date: str | None) -> list[HabitSummary]:
+        value = self._date(selected_date, date.today())
+        habits = await self.db_controller.get_habits()
+        summaries = [await self._summary(habit, value) for habit in habits]
+        return [summary for summary in summaries if summary.status != "rest"]
 
     async def get_overview(self, start_date: str | None, end_date: str | None) -> HabitsOverview:
         end = self._date(end_date, date.today())

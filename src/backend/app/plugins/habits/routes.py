@@ -17,9 +17,11 @@ class HabitsRouter:
         self.router.add_api_route("", self.get_habits, methods=["GET"])
         self.router.add_api_route("", self.create_habit, methods=["POST"])
         self.router.add_api_route("/today", self.get_today, methods=["GET"])
+        self.router.add_api_route("/day", self.get_day, methods=["GET"])
         self.router.add_api_route("/overview", self.get_overview, methods=["GET"])
         self.router.add_api_route("/{habit_id}", self.get_habit, methods=["GET"])
         self.router.add_api_route("/{habit_id}", self.update_habit, methods=["PATCH"])
+        self.router.add_api_route("/{habit_id}", self.delete_habit, methods=["DELETE"])
         self.router.add_api_route("/{habit_id}/history", self.get_history, methods=["GET"])
         self.router.add_api_route("/{habit_id}/complete", self.complete, methods=["POST"])
         self.router.add_api_route("/{habit_id}/complete/{occurrence_date}", self.undo, methods=["DELETE"])
@@ -46,6 +48,12 @@ class HabitsRouter:
     async def get_today(self):
         return await self.controller.get_today()
 
+    async def get_day(self, date: str | None = None):
+        try:
+            return await self.controller.get_day(date)
+        except ValueError as error:
+            self._bad_request(error)
+
     async def get_overview(self, start_date: str | None = None, end_date: str | None = None):
         try:
             return await self.controller.get_overview(start_date, end_date)
@@ -65,6 +73,13 @@ class HabitsRouter:
             raise HTTPException(status_code=404, detail=str(error))
         except ValueError as error:
             self._bad_request(error)
+
+    async def delete_habit(self, habit_id: int):
+        try:
+            await self.controller.delete_habit(habit_id)
+            return {"message": "Habit deleted successfully"}
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail=str(error))
 
     async def get_history(self, habit_id: int, start_date: str | None = None,
                           end_date: str | None = None):

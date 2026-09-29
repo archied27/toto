@@ -95,6 +95,14 @@ class HabitsDBController:
             f"UPDATE habits_habits SET {columns} WHERE id = ?", params
         )
 
+    async def delete_habit(self, habit_id: int):
+        await self.core.db_manager.execute(
+            "DELETE FROM habits_completions WHERE habit_id = ?", (habit_id,)
+        )
+        await self.core.db_manager.execute(
+            "DELETE FROM habits_habits WHERE id = ?", (habit_id,)
+        )
+
     async def get_completions(self, habit_id: int, start_date: str, end_date: str) -> dict[str, str]:
         rows = await self.core.db_manager.fetch_all(
             """

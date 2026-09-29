@@ -25,7 +25,7 @@ class WeatherDaily:
 @dataclass
 class WeatherState:
     dashboard_priority: int = 0
-    page_priority: int = 15
+    page_priority: int = 5
     base_priority: int = 0
     current_weather: Optional[WeatherAtTime] = None
     two_week_overview: list[WeatherDaily] = field(default_factory=list)

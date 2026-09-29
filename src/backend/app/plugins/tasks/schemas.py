@@ -43,7 +43,7 @@ TaskList.model_rebuild()
 
 class TasksState(BaseModel):
     dashboard_priority: int = 0
-    page_priority: int = 50
+    page_priority: int = 20
     base_priority: int = 50
     overdue_tasks: list[Task] = Field(default_factory=list)
     today_tasks: list[Task] = Field(default_factory=list)

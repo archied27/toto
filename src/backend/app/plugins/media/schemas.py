@@ -5,7 +5,7 @@ from typing import Literal, Optional
 @dataclass
 class MPVState:
     dashboard_priority: int = 0
-    page_priority: int = 50
+    page_priority: int = 20
     base_priority: int = 50
 
 class HomePageResult(BaseModel):
