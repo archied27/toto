@@ -89,7 +89,7 @@ class TMDBApiController:
 
     async def get_series_details(self, id: int):
         """
-        fetches and returns series details
+        fetches and returns series details with all seasons and episodes
         """
         data = None
         logo_path = None
@@ -119,8 +119,18 @@ class TMDBApiController:
         if data == None:
             return None
 
+        # Fetch all seasons in parallel
+        seasons = []
+        season_tasks = [self.get_season_details(id, season_num) for season_num in range(1, data["number_of_seasons"] + 1)]
+        season_results = await asyncio.gather(*season_tasks, return_exceptions=True)
+
+        for season_details in season_results:
+            if season_details and not isinstance(season_details, Exception):
+                seasons.append(season_details)
+
         return {"title": data["name"], "poster_path": data["poster_path"],
-        "logo_path": logo_path, "id": id, "backdrop_path": data["backdrop_path"], "number_of_seasons": data["number_of_seasons"]}
+        "logo_path": logo_path, "id": id, "backdrop_path": data["backdrop_path"],
+        "number_of_seasons": data["number_of_seasons"], "seasons": seasons}
 
     async def get_season_details(self, series_id: int, season_num: int = 1):
         """

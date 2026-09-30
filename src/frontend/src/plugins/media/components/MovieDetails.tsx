@@ -5,6 +5,7 @@ import { getReleaseTypeDescription, useDominantColor } from "../utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { apiFetch } from "@/hooks/api";
 
 export function MovieDetails({ movieId, close }: { movieId: number; close?: () => void }) {
     const { getMovieDetails, loading } = useGetMovieDetails(movieId);
@@ -18,6 +19,20 @@ export function MovieDetails({ movieId, close }: { movieId: number; close?: () =
 
         fetchMovieDetails();
     }, [getMovieDetails]);
+
+    const handleStream = async () => {
+        try {
+            await apiFetch("/media/stream", {
+                method: "POST",
+                body: JSON.stringify({
+                    media_type: "movie",
+                    tmdb_id: movieId,
+                }),
+            });
+        } catch (error) {
+            console.error("Failed to start stream", error);
+        }
+    };
 
     const posterUrl = movieDetails?.poster_path
         ? `https://image.tmdb.org/t/p/w200${movieDetails.poster_path}`
@@ -101,6 +116,7 @@ export function MovieDetails({ movieId, close }: { movieId: number; close?: () =
                         </Button>
                         <Button
                             variant="outline"
+                            onClick={handleStream}
                             className="flex-1 h-auto flex-col gap-1.5 py-3 rounded-2xl bg-white/[0.06] border border-white/10 text-white/90 hover:bg-white/10 hover:text-white active:scale-[0.97] transition-transform duration-150"
                         >
                             <Cast className="w-[18px] h-[18px]" strokeWidth={1.75} />

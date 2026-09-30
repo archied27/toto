@@ -325,7 +325,7 @@ function HabitCard({ summary, onToggle, onRefresh }: { summary: HabitSummary; on
             </Button>
             <div className="min-w-0 flex-1">
                 <p className={cn("truncate font-semibold", completed && "text-muted-foreground line-through")}>{summary.habit.name}</p>
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground"><span>{statusLabels[summary.status]}</span><span>{scheduleLabel(summary.habit)}</span></div>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground"><span>{statusLabels[summary.status]}</span><span>|</span><span>{scheduleLabel(summary.habit)}</span></div>
             </div>
             {summary.current_streak > 0 && <span className="flex shrink-0 items-center gap-1 text-xs font-semibold" style={{ color: colour }} title="Current streak"><Flame className="size-4" />{summary.current_streak}</span>}
             <div className="ml-1 h-7 w-px bg-border/70" aria-hidden="true" />
@@ -532,9 +532,28 @@ export default function HabitsPage() {
                             Nothing scheduled for this day.
                         </div>
                     ) : (
-                        <div className="flex flex-col gap-2">
-                            {dayHabits.map((summary) => <HabitCard key={summary.habit.id} summary={summary} onToggle={() => void toggleHabit(summary)} onRefresh={refresh} />)}
-                        </div>
+                        <>
+                            {/* Active habits for today */}
+                            <div className="flex flex-col gap-2">
+                                {dayHabits.filter((summary) => summary.status !== "not_due").map((summary) => (
+                                    <HabitCard key={summary.habit.id} summary={summary} onToggle={() => void toggleHabit(summary)} onRefresh={refresh} />
+                                ))}
+                            </div>
+
+                            {/* Non-scheduled habits (not_due only) */}
+                            {dayHabits.filter((summary) => summary.status === "not_due").length > 0 && (
+                                <details className="mt-4 rounded-xl border border-border/40 bg-muted/20">
+                                    <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors select-none">
+                                        Other habits ({dayHabits.filter((summary) => summary.status === "not_due").length})
+                                    </summary>
+                                    <div className="flex flex-col gap-2 p-3 pt-0 opacity-60">
+                                        {dayHabits.filter((summary) => summary.status === "not_due").map((summary) => (
+                                            <HabitCard key={summary.habit.id} summary={summary} onToggle={() => void toggleHabit(summary)} onRefresh={refresh} />
+                                        ))}
+                                    </div>
+                                </details>
+                            )}
+                        </>
                     )}
                 </section>
             </div>
@@ -571,7 +590,7 @@ export function HabitsSmall() {
 export function HabitsLong() {
     const { navigate } = useNavigation();
     const state = useHabitsDashboardState();
-    const habits = state?.today?.filter((item) => item.status !== "rest").slice(0, 5) ?? [];
+    const habits = state?.today?.filter((item) => item.status !== "rest" && item.status !== "not_due").slice(0, 5) ?? [];
     const remaining = state?.due_today ?? 0;
     const topStreak = state?.current_streaks?.[0];
     return <WidgetContainer onClick={() => navigate("habits")} className="cursor-pointer"><div className="flex h-full min-w-0 items-center gap-3 overflow-hidden"><div className="flex shrink-0 items-center gap-2 border-r border-border/70 pr-3"><span className="text-xs font-semibold">Today</span><span className="text-xs font-bold text-amber-300">{remaining} left</span></div><div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">{habits.length ? habits.map((item) => <div key={item.habit.id} className="flex min-w-0 flex-1 items-center gap-1.5"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: habitColour(item.habit) }} /><span className="truncate text-xs">{item.habit.name}</span><span className={cn("shrink-0 text-[10px]", item.status === "completed" ? "text-emerald-300" : item.status === "missed" ? "text-rose-300" : "text-muted-foreground")}>{item.status === "completed" ? "Done" : item.status === "missed" ? "Missed" : "Open"}</span></div>) : <span className="text-xs text-muted-foreground">Nothing scheduled today</span>}</div><div className="flex shrink-0 items-center gap-1 border-l border-border/70 pl-3 text-xs text-amber-300"><Flame className="size-3.5" /><span>{topStreak ? `${topStreak.current_streak}d` : "0d"}</span></div></div></WidgetContainer>;

@@ -9,10 +9,13 @@ import { usePages } from './hooks/usePages'
 import { pageRegistry, type AppPage } from './hooks/pageRegistry'
 import { type WidgetSlot, resolveSlot } from './dashboard/DashboardPage'
 import { useDashboard } from './hooks/useDashboard'
+import { useOrientation } from './hooks/useOrientation'
+import CompanionMode from './dashboard/CompanionMode'
 
 function AppInner({ pages }: { pages: AppPage[] }) {
   const { currentIndex, navigate } = useNavigation()
   const { slots } = useDashboard()
+  const orientation = useOrientation()
   const [longSlot, setLongSlot] = useState<WidgetSlot | null>(null);
 
   useEffect(() => {
@@ -25,6 +28,7 @@ function AppInner({ pages }: { pages: AppPage[] }) {
   const pageIds = pages.map(page => page.id)
 
   const anyOverlayOpen = isCommandBar || isAgentTools
+  const isLandscape = orientation === 'landscape'
 
   // Tap: open CommandBar if nothing's open, otherwise close whatever IS open
   const handleTap = () => {
@@ -51,22 +55,28 @@ function AppInner({ pages }: { pages: AppPage[] }) {
         <AgentToolsPanel onClose={() => setIsAgentTools(false)} open={isAgentTools} />
       )}
       <div
-        className={`flex-1 min-h-0 transition-all duration-300 ease-in-out 
+        className={`flex-1 min-h-0 transition-all duration-300 ease-in-out
         ${anyOverlayOpen ? 'blur-sm brightness-50 pointer-events-none select-none' : ''}`}
       >
-        <SwipeNavigator
-          pages={pages}
-          currentIndex={currentIndex}
-          onPageChange={(index) => navigate(pageIds[index])}
-        />
+        {isLandscape ? (
+          <CompanionMode onOpenCommandBar={() => setIsCommandBar(true)} />
+        ) : (
+          <SwipeNavigator
+            pages={pages}
+            currentIndex={currentIndex}
+            onPageChange={(index) => navigate(pageIds[index])}
+          />
+        )}
       </div>
-      <DotsIndicator
-        currentIndex={currentIndex}
-        total={pages.length}
-        isCommandBar={anyOverlayOpen}
-        onClick={handleTap}
-        onSwipeUp={handleSwipeUp}
-      />
+      {!isLandscape && (
+        <DotsIndicator
+          currentIndex={currentIndex}
+          total={pages.length}
+          isCommandBar={anyOverlayOpen}
+          onClick={handleTap}
+          onSwipeUp={handleSwipeUp}
+        />
+      )}
     </div>
   )
 }

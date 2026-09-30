@@ -1,12 +1,14 @@
 from app.schemas.base_plugin import BasePlugin
 from app.plugins.media.routes import MediaRouter
 from app.plugins.media.controller.media_controller import MediaController
+from app.plugins.media.state import MediaState
 
 class MediaPlugin(BasePlugin):
     async def setup(self, core):
+        self.core = core
         self.controller = MediaController(core)
         self.router = MediaRouter(self.controller)
-        
+
         await self.controller.setup()
 
     def get_router(self):
@@ -22,7 +24,9 @@ class MediaPlugin(BasePlugin):
         pass
 
     async def load_state(self):
-        pass
+        # Initialize media state with page_priority so it appears in pages
+        state = MediaState(page_priority=20)
+        await self.core.state.set("media", state)
 
     def get_name(self):
         return "media"

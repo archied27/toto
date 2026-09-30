@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useMemo } from "react";
 
 type DotsIndicatorProps = {
     currentIndex: number;
@@ -56,6 +56,39 @@ export default function DotsIndicator({
         startY.current = null;
     };
 
+    // Calculate which dots to show with indicator dots for more pages
+    const visibleDots = useMemo(() => {
+        if (total <= 3) {
+            // Show all dots if 3 or fewer
+            return {
+                dots: Array.from({ length: total }, (_, i) => i),
+                hasMore: { left: false, right: false },
+            };
+        }
+
+        // Always show 3 main dots, with indicators if there are more
+        const dots: number[] = [];
+        let hasMoreLeft = false;
+        let hasMoreRight = false;
+
+        if (currentIndex === 0) {
+            // At start: show 0, 1, 2
+            dots.push(0, 1, 2);
+            hasMoreRight = total > 3;
+        } else if (currentIndex === total - 1) {
+            // At end: show n-3, n-2, n-1
+            dots.push(total - 3, total - 2, total - 1);
+            hasMoreLeft = total > 3;
+        } else {
+            // Middle: show current-1, current, current+1
+            dots.push(currentIndex - 1, currentIndex, currentIndex + 1);
+            hasMoreLeft = currentIndex > 1;
+            hasMoreRight = currentIndex < total - 2;
+        }
+
+        return { dots, hasMore: { left: hasMoreLeft, right: hasMoreRight } };
+    }, [currentIndex, total]);
+
     return (
         <div
             className={[
@@ -96,17 +129,30 @@ export default function DotsIndicator({
                         </svg>
                     </div>
                 ) : (
-                    Array.from({ length: total }).map((_, i) => (
-                        <div
-                            key={i}
-                            className={[
-                                "w-2 h-2 rounded-full transition-all duration-200",
-                                i === currentIndex
-                                    ? "bg-primary w-4"
-                                    : "bg-muted-foreground/60 w-1",
-                            ].join(" ")}
-                        />
-                    ))
+                    <>
+                        {/* Left indicator dot for more pages */}
+                        {visibleDots.hasMore.left && (
+                            <div className="w-1 h-1 rounded-full bg-muted-foreground/30 transition-all duration-300" />
+                        )}
+
+                        {/* Main dots */}
+                        {visibleDots.dots.map((dotIndex) => (
+                            <div
+                                key={dotIndex}
+                                className={[
+                                    "rounded-full transition-all duration-300",
+                                    dotIndex === currentIndex
+                                        ? "bg-primary w-4 h-2"
+                                        : "bg-muted-foreground/60 w-2 h-2",
+                                ].join(" ")}
+                            />
+                        ))}
+
+                        {/* Right indicator dot for more pages */}
+                        {visibleDots.hasMore.right && (
+                            <div className="w-1 h-1 rounded-full bg-muted-foreground/30 transition-all duration-300" />
+                        )}
+                    </>
                 )}
             </button>
         </div>

@@ -12,6 +12,7 @@ class MediaRouter:
         self.router.add_api_route("/sync", self.sync, methods=["POST"])
         self.router.add_api_route("/playing", self.playing, methods=["GET"])
         self.router.add_api_route("/play", self.play, methods=["POST"])
+        self.router.add_api_route("/stream", self.stream, methods=["POST"])
         self.router.add_api_route("/{agent_id}/{action}", self.control, methods=["POST"])
 
     async def search(self, query: str, media_type: str = "all"):
@@ -30,6 +31,12 @@ class MediaRouter:
         return await self.controller.play(
             payload["media_type"], int(payload["tmdb_id"]), payload["agent_id"],
             payload.get("season_number"), payload.get("episode_number"), payload.get("start_seconds"),
+        )
+
+    async def stream(self, payload: dict = Body(...)):
+        return await self.controller.stream(
+            payload["media_type"], int(payload["tmdb_id"]),
+            payload.get("season_number"), payload.get("episode_number")
         )
 
     async def control(self, agent_id: str, action: str, payload: dict = Body(default=None)):

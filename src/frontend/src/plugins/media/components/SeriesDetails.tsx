@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Cast, ChevronDown, Download, Play, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { apiFetch } from "@/hooks/api";
 
 export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: () => void }) {
     const { getSeriesDetails, loading } = useGetSeriesDetails(seriesId);
@@ -27,6 +28,22 @@ export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: (
         ? `https://image.tmdb.org/t/p/w200${seriesDetails.poster_path}`
         : undefined;
     const dominantColor = useDominantColor(posterUrl);
+
+    const handleStreamEpisode = async (seasonNumber: number, episodeNumber: number) => {
+        try {
+            await apiFetch("/media/stream", {
+                method: "POST",
+                body: JSON.stringify({
+                    media_type: "series",
+                    tmdb_id: seriesId,
+                    season_number: seasonNumber,
+                    episode_number: episodeNumber,
+                }),
+            });
+        } catch (error) {
+            console.error("Failed to start stream", error);
+        }
+    };
 
     if (loading) {
         return <Skeleton className="w-full h-64" />;
@@ -161,9 +178,11 @@ export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: (
                     {selectedSeason && selectedSeason.episodes.map((episode) => {
                         const still_path = episode.still_path ? `https://image.tmdb.org/t/p/w500${episode.still_path}` : undefined;
                         const available = isEpisodeAvailable(episode.air_date);
-                        
+                        const seasonNumber = seriesDetails.seasons.findIndex(s => s === selectedSeason) + 1;
+
                         return (
                             <Card
+                                key={episode.episode_num}
                                 className={`overflow-hidden mb-3 rounded-xl border border-white/10 bg-white/[0.04] p-0 ${!available ? "opacity-50" : ""}`}
                                 style={{
                                     background: dominantColor
@@ -194,6 +213,17 @@ export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: (
                                             {episode.description}
                                         </p>
                                     </div>
+
+                                    {available && (
+                                        <Button
+                                            onClick={() => handleStreamEpisode(seasonNumber, episode.episode_num)}
+                                            variant="ghost"
+                                            size="icon"
+                                            className="shrink-0 self-center mr-3 h-9 w-9 rounded-full bg-white/[0.06] text-white/90 hover:bg-white/10 hover:text-white"
+                                        >
+                                            <Cast className="w-4 h-4" strokeWidth={1.75} />
+                                        </Button>
+                                    )}
                                 </div>
                             </Card>
                         );

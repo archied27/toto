@@ -108,3 +108,23 @@ class MediaController:
                 state = await self.core.agents.dispatch(agent.device_id, "media_get_state", {})
                 await self.db.save_state(agent.device_id, state)
         return await self.db.get_playing(agent_id)
+
+    async def stream(self, media_type: str, tmdb_id: int,
+                    season_number: int | None = None, episode_number: int | None = None) -> dict[str, Any]:
+        """Generate movy.sx streaming URL and open in browser on host agent."""
+        if media_type == "movie":
+            url = f"https://www.movy.sx/movie/{tmdb_id}?play=true"
+        elif media_type in ("series", "show", "tv", "episode"):
+            if season_number is None or episode_number is None:
+                return {"status": "error", "message": "Season and episode numbers required for series"}
+            url = f"https://www.movy.sx/tv/{tmdb_id}/{season_number}/{episode_number}?play=true"
+        else:
+            return {"status": "error", "message": f"Unknown media_type: {media_type}"}
+
+        # Open URL in default browser on host
+        import webbrowser
+        try:
+            webbrowser.open(url)
+            return {"status": "success", "url": url}
+        except Exception as e:
+            return {"status": "error", "message": f"Failed to open browser: {str(e)}"}
