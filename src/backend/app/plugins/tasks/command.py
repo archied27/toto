@@ -243,6 +243,44 @@ class TasksCommand(BaseCommand):
                 loading_msg="Adding Task",
             ),
             IntentSpec(
+                name="start_work",
+                command_name="Start Working On Task",
+                description="start working on a specific task",
+                type="write",
+                examples=[
+                    "start working on essay",
+                    "begin task coding problems",
+                    "work on ai coursework",
+                ],
+                slots=AddTaskSlots,  # Reuse task name slot for simplicity
+                loading_msg="Starting Work",
+            ),
+            IntentSpec(
+                name="stop_work",
+                command_name="Stop Working On Task",
+                description="stop working on the current task",
+                type="write",
+                examples=[
+                    "stop working on task",
+                    "end work session",
+                    "finish working",
+                ],
+                loading_msg="Stopping Work",
+            ),
+            IntentSpec(
+                name="set_pomodoro_goal",
+                command_name="Set Pomodoro Goal",
+                description="set the pomodoro timer goal for a task in minutes",
+                type="write",
+                examples=[
+                    "set pomodoro goal for essay to 25 minutes",
+                    "make task coding problems pomodoro 30 minutes",
+                    "set work timer for ai coursework to 15 minutes",
+                ],
+                slots=AddTaskSlots,  # Reuse task name slot and add a number slot for minutes
+                loading_msg="Setting Pomodoro Goal",
+            ),
+            IntentSpec(
                 name="show_add_task",
                 command_name="Input A New Task",
                 description="show the add task form to add a new task",
@@ -319,3 +357,74 @@ class TasksCommand(BaseCommand):
             created_task = await self.controller.get_task(id)
 
             return CommandResult(True, "add_task", "Task added successfully", {"task": created_task})
+
+        if intent == "start_work":
+            # We need to find the task by name or description? The slot is AddTaskSlots which gives task_name.
+            # For simplicity, we'll search for a task by title (case-insensitive) and take the first match.
+            # In a real scenario, we might want to use an ID, but the user said "start working on essay".
+            # We'll search for tasks with matching title.
+            task_name = extracted.get("task_name")
+            if not task_name:
+                return CommandResult(False, "start_work", "Could not understand which task to start working on", {})
+            tasks = await self.controller.get_all_tasks()
+            # Find first task with title matching (case-insensitive)
+            matched_task = None
+            for t in tasks:
+                if t.title.lower() == task_name.lower():
+                    matched_task = t
+                    break
+            if not matched_task:
+                return CommandResult(False, "start_work", f"No task found with name '{task_name}'", {})
+            await self.controller.start_work(str(matched_task.id))
+            return CommandResult(True, "start_work", f"Started working on '{matched_task.title}'", {"task_id": matched_task.id})
+
+        if intent == "stop_work":
+            # Stop working on the currently working task, or if there is one? We'll stop the task that is currently working.
+            tasks = await self.controller.get_all_tasks()
+            # Find a task that is currently working (is_working == True)
+            current_work = None
+            for t in tasks:
+                if t.is_working:
+                    current_work = t
+                    break
+            if not current_work:
+                return CommandResult(False, "stop_work", "No task is currently being worked on", {})
+            await self.controller.stop_work(str(current_work.id))
+            return CommandResult(True, "stop_work", f"Stopped working on '{current_work.title}'", {"task_id": current_work.id})
+
+        if intent == "set_pomodoro_goal":
+            # We need to find the task by name and extract the goal from the raw text or slots
+            # For simplicity, we'll look for a number in the raw text that represents minutes
+            task_name = extracted.get("task_name")
+            if not task_name:
+                return CommandResult(False, "set_pomodoro_goal", "Could not understand which task to set pomodoro goal for", {})
+
+            # Extract goal from raw text - look for numbers that might be minutes
+            import re
+            numbers = re.findall(r'\b\d+\b', raw)
+            goal_minutes = None
+            for num_str in numbers:
+                num = int(num_str)
+                # Reasonable pomodoro goal: 1-120 minutes
+                if 1 <= num <= 120:
+                    goal_minutes = num
+                    break
+
+            if goal_minutes is None:
+                # Default to 25 minutes if no number found
+                goal_minutes = 25
+
+            goal_seconds = goal_minutes * 60
+
+            tasks = await self.controller.get_all_tasks()
+            # Find first task with title matching (case-insensitive)
+            matched_task = None
+            for t in tasks:
+                if t.title.lower() == task_name.lower():
+                    matched_task = t
+                    break
+            if not matched_task:
+                return CommandResult(False, "set_pomodoro_goal", f"No task found with name '{task_name}'", {})
+
+            await self.controller.set_pomodoro_goal(str(matched_task.id), goal_seconds)
+            return CommandResult(True, "set_pomodoro_goal", f"Set pomodoro goal for '{matched_task.title}' to {goal_minutes} minutes", {"task_id": matched_task.id, "goal_minutes": goal_minutes})

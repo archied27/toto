@@ -1,18 +1,59 @@
-import { useTaskState } from "./useTasks";
+import { useTaskState, useStopWork, type Task } from "./useTasks";
 import TaskCard from "./components/TaskCard";
 import { useNavigation } from "@/hooks/NavigationContext";
 import { WidgetContainer } from "@/components/WidgetContainer";
-import { CircleAlertIcon, ClockIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CircleAlertIcon, ClockIcon, PauseIcon, TimerIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 
 const maxTasksToShow = 2;
+
+function formatTimer(seconds: number): string {
+    const safeSeconds = Math.max(0, Math.floor(seconds));
+    const hours = Math.floor(safeSeconds / 3600);
+    const minutes = Math.floor((safeSeconds % 3600) / 60);
+    const remainingSeconds = safeSeconds % 60;
+    if (hours > 0) {
+        return `${hours}:${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+    }
+    return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+function useLiveWorkSeconds(task: Task | null): number {
+    const [now, setNow] = useState(() => Date.now());
+
+    useEffect(() => {
+        if (!task?.is_working) return;
+        const interval = window.setInterval(() => setNow(Date.now()), 1000);
+        return () => window.clearInterval(interval);
+    }, [task?.is_working]);
+
+    if (!task) return 0;
+    const sessionSeconds = task.is_working && task.work_session_start
+        ? Math.max(0, Math.floor((now - new Date(task.work_session_start).getTime()) / 1000))
+        : 0;
+    return (task.time_spent ?? 0) + sessionSeconds;
+}
 
 export function TasksHero() {
     const { taskState } = useTaskState();
     const { navigate } = useNavigation();
+    const { stopWork } = useStopWork();
 
     const overdueTasks = taskState ? taskState.overdue_tasks.filter((t) => !t.completed) : [];
     const dueTodayTasks = taskState ? taskState.tasks_due_today.filter((t) => !t.completed) : [];
     const todayTasks = taskState ? taskState.today_tasks.filter((t) => !t.completed) : [];
+    const availableTasks = [...overdueTasks, ...dueTodayTasks, ...todayTasks]
+        .filter((task, index, tasks) => tasks.findIndex(candidate => candidate.id === task.id) === index);
+    const activeTask = availableTasks.find(task => task.is_working) ?? null;
+    const elapsedSeconds = useLiveWorkSeconds(activeTask);
+    const goalSeconds = activeTask?.pomodoro_goal || 1500;
+    const progress = Math.min(100, (elapsedSeconds / goalSeconds) * 100);
+    const ringRadius = 42;
+
+    const handleStop = async (task: Task) => {
+        await stopWork(task.id);
+    };
 
     const showOverdueTasks = overdueTasks.length > 0;
     const showTasksDueToday = dueTodayTasks.length > 0;
@@ -36,6 +77,60 @@ export function TasksHero() {
 
     return (
         <WidgetContainer onClick={() => navigate("tasks")}>
+            {activeTask ? (
+                <div className="flex h-full min-h-40 flex-col justify-between gap-4 py-1">
+                    <div className="flex min-w-0 items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 text-xs font-medium text-blue-400">
+                                <TimerIcon className="h-3.5 w-3.5 animate-pulse" />
+                                Working now
+                            </div>
+                            <p className="mt-1 break-words text-base font-semibold leading-snug text-foreground">{activeTask.title}</p>
+                        </div>
+                        <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-9 w-9 shrink-0"
+                            aria-label="Pause work timer"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                void handleStop(activeTask);
+                            }}
+                        >
+                            <PauseIcon className="h-4 w-4 text-yellow-400" />
+                        </Button>
+                    </div>
+                    <div className="flex min-h-0 items-center gap-5">
+                    <div className="relative flex size-36 shrink-0 items-center justify-center">
+                        <svg className="absolute inset-0 size-full -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
+                            <circle cx="50" cy="50" r={ringRadius} fill="none" className="stroke-muted" strokeWidth="5" />
+                            <circle
+                                cx="50"
+                                cy="50"
+                                r={ringRadius}
+                                fill="none"
+                                className={progress >= 100 ? "stroke-emerald-500" : "stroke-blue-400"}
+                                strokeWidth="5"
+                                strokeLinecap="round"
+                                pathLength="100"
+                                style={{ strokeDasharray: "100", strokeDashoffset: `${100 - progress}` }}
+                            />
+                        </svg>
+                        <span className="text-3xl font-semibold tabular-nums tracking-tight">{formatTimer(elapsedSeconds)}</span>
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
+                        <span className="text-sm tabular-nums text-muted-foreground">Goal {formatTimer(goalSeconds)}</span>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                            <div
+                                className={`h-full rounded-full transition-[width] duration-1000 ${progress >= 100 ? "bg-emerald-500" : "bg-blue-400"}`}
+                                style={{ width: `${progress}%` }}
+                            />
+                        </div>
+                    </div>
+                    </div>
+                </div>
+            ) : (
+                <>
             { /* Overdue Tasks */ }
             { showOverdueTasks && (
                 overdueCount > 0 ? (
@@ -101,7 +196,8 @@ export function TasksHero() {
                     <p className="text-xs text-muted-foreground text-center">+{todayHidden} more to do today</p>
                 )
             ) }
-
+                </>
+            )}
         </WidgetContainer>
     );
 }
@@ -149,7 +245,6 @@ export function TasksSmall() {
     const todayCount = taskState ? taskState.today_tasks.filter((t) => !t.completed).length : 0;
 
     const totalPending = overdueCount + dueTodayCount + todayCount;
-1
     const primary = overdueCount > 0
         ? { count: overdueCount, label: "Overdue", color: "text-red-500", icon: true }
         : dueTodayCount > 0

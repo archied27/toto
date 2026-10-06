@@ -38,6 +38,10 @@ class Task(BaseModel):
     date_completed: Optional[str] = None
     labels: list[Label] = Field(default_factory=list)
     task_list: Optional[TaskList] = None
+    is_working: bool = False
+    time_spent: int = 0
+    work_session_start: Optional[str] = None
+    pomodoro_goal: int = 1500  # default 25 minutes in seconds
 
 TaskList.model_rebuild()
 

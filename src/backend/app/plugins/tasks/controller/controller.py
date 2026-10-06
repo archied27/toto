@@ -173,6 +173,21 @@ class TasksController:
     async def get_tasks_completed_on(self, iso_date: str) -> list[Task]:
         return await self.db_controller.get_tasks_completed_on(iso_date)
 
+    async def start_work(self, task_id: str):
+        # start working on a task
+        await self.db_controller.start_work(int(task_id))
+        await self.update_state()
+
+    async def stop_work(self, task_id: str):
+        # stop working on a task
+        await self.db_controller.stop_work(int(task_id))
+        await self.update_state()
+
+    async def set_pomodoro_goal(self, task_id: str, goal_seconds: int):
+        # set pomodoro goal for a task
+        await self.db_controller.set_pomodoro_goal(int(task_id), goal_seconds)
+        await self.update_state()
+
     async def get_list_by_name(self, name: str) -> Optional[TaskList]:
         return await self.db_controller.get_list_by_name(name)
 

@@ -31,11 +31,8 @@ export function ContinueWatchingSection({
   return (
     <section className="flex flex-col gap-3">
       <h2 className="px-3 text-lg font-semibold text-foreground">Continue Watching</h2>
-      <div className="swiper-no-swiping flex max-w-full gap-3 overflow-x-auto overscroll-x-contain px-3 pb-2 touch-pan-x [scrollbar-width:thin]">
+      <div className="swiper-no-swiping flex max-w-full gap-3 overflow-x-auto overscroll-x-contain px-3 pb-2 touch-pan-x scrollbar-none">
         {continueWatching.map((item) => {
-          const progressPercent = item.duration_seconds > 0
-            ? Math.min((item.progress_seconds / item.duration_seconds) * 100, 100)
-            : 0;
           const episodeLabel = item.media_type === "episode"
             ? `S${String(item.season_number ?? 0).padStart(2, "0")}E${String(item.episode_number ?? 0).padStart(2, "0")}`
             : "Movie";
@@ -61,12 +58,6 @@ export function ContinueWatchingSection({
                     {item.title}
                   </div>
                 )}
-                <div className="absolute inset-x-0 bottom-0 h-1 bg-black/40">
-                  <div
-                    className="h-full bg-primary transition-[width] duration-300"
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
               </div>
               <h3 className="mt-2 truncate text-sm font-bold text-foreground">{item.title}</h3>
               <p className="truncate text-[0.725rem] font-bold text-muted-foreground">

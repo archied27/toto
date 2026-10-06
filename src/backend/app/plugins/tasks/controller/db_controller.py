@@ -36,7 +36,11 @@ class TasksDBController:
                 completed BOOLEAN,
                 date_created TEXT,
                 date_completed TEXT,
-                list_id INTEGER
+                list_id INTEGER,
+                is_working BOOLEAN DEFAULT 0,
+                time_spent INTEGER DEFAULT 0,
+                work_session_start TEXT,
+                pomodoro_goal INTEGER DEFAULT 1500
             );
 
             CREATE TABLE IF NOT EXISTS tasks_tasks_labels (
@@ -46,6 +50,23 @@ class TasksDBController:
             );
             """
         )
+        existing_columns = {
+            row["name"]
+            for row in await self.core.db_manager.fetch_all(
+                "PRAGMA table_info(tasks_tasks)"
+            )
+        }
+        columns = {
+            "is_working": "BOOLEAN DEFAULT 0",
+            "time_spent": "INTEGER DEFAULT 0",
+            "work_session_start": "TEXT",
+            "pomodoro_goal": "INTEGER DEFAULT 1500",
+        }
+        for name, definition in columns.items():
+            if name not in existing_columns:
+                await self.core.db_manager.execute(
+                    f"ALTER TABLE tasks_tasks ADD COLUMN {name} {definition}"
+                )
 
     # -------------------------------------------------------------------------
     # Labels
@@ -151,7 +172,11 @@ class TasksDBController:
             date_created=row["date_created"],
             date_completed=row["date_completed"],
             labels=labels,
-            task_list=task_list
+            task_list=task_list,
+            is_working=bool(row["is_working"]),
+            time_spent=row["time_spent"],
+            work_session_start=row["work_session_start"],
+            pomodoro_goal=row["pomodoro_goal"]
         )
 
     async def add_task(self, task: CreateTask):
@@ -243,6 +268,56 @@ class TasksDBController:
                     "INSERT INTO tasks_tasks_labels (task_id, label_id) VALUES (?, ?)",
                     (id, label_id)
                 )
+
+    # -------------------------------------------------------------------------
+    # Work Session
+    # -------------------------------------------------------------------------
+
+    async def start_work(self, task_id: int):
+        from datetime import datetime, timezone
+        start_time = datetime.now(timezone.utc).isoformat()
+        await self.core.db_manager.execute(
+            "UPDATE tasks_tasks SET is_working = 1, work_session_start = ? WHERE id = ?",
+            (start_time, task_id)
+        )
+
+    async def stop_work(self, task_id: int):
+        from datetime import datetime, timezone
+        # First, get the current work_session_start and the current time_spent
+        row = await self.core.db_manager.fetch_one(
+            "SELECT work_session_start, time_spent FROM tasks_tasks WHERE id = ?",
+            (task_id,)
+        )
+        if not row or not row["work_session_start"]:
+            # If there's no work session started, we just set is_working to 0 and leave time_spent as is?
+            await self.core.db_manager.execute(
+                "UPDATE tasks_tasks SET is_working = 0, work_session_start = NULL WHERE id = ?",
+                (task_id,)
+            )
+            return
+
+        start_time = datetime.fromisoformat(row["work_session_start"])
+        now = datetime.now(timezone.utc)
+        elapsed_seconds = int((now - start_time).total_seconds())
+
+        new_time_spent = row["time_spent"] + elapsed_seconds
+
+        await self.core.db_manager.execute(
+            """
+            UPDATE tasks_tasks
+            SET is_working = 0,
+                work_session_start = NULL,
+                time_spent = ?
+            WHERE id = ?
+            """,
+            (new_time_spent, task_id)
+        )
+
+    async def set_pomodoro_goal(self, task_id: int, goal_seconds: int):
+        await self.core.db_manager.execute(
+            "UPDATE tasks_tasks SET pomodoro_goal = ? WHERE id = ?",
+            (goal_seconds, task_id)
+        )
 
     async def delete_task(self, task_id: int):
         await self.core.db_manager.execute(

@@ -24,6 +24,10 @@ export interface Task {
     date_completed?: string;
     labels?: Label[];
     task_list?: TaskList;
+    is_working?: boolean;
+    time_spent?: number;
+    work_session_start?: string;
+    pomodoro_goal?: number;
 }
 
 export interface TaskState {
@@ -340,6 +344,63 @@ export function useDeleteTask() {
     }, []);
 
     return { deleteTask, loading };
+}
+
+export function useStartWork() {
+    const [loading, setLoading] = useState(false);
+
+    const startWork = useCallback(async (taskId: number) => {
+        setLoading(true);
+        try {
+            await apiFetch(`/tasks/start_work/${taskId}`, {
+                method: "PUT",
+            });
+        } catch (error) {
+            console.error("Failed to start work on task", error);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    return { startWork, loading };
+}
+
+export function useStopWork() {
+    const [loading, setLoading] = useState(false);
+
+    const stopWork = useCallback(async (taskId: number) => {
+        setLoading(true);
+        try {
+            await apiFetch(`/tasks/stop_work/${taskId}`, {
+                method: "PUT",
+            });
+        } catch (error) {
+            console.error("Failed to stop work on task", error);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    return { stopWork, loading };
+}
+
+export function useSetPomodoroGoal() {
+    const [loading, setLoading] = useState(false);
+
+    const setPomodoroGoal = useCallback(async (taskId: number, goalMinutes: number) => {
+        setLoading(true);
+        try {
+            await apiFetch(`/tasks/set_pomodoro_goal/${taskId}?goal_seconds=${goalMinutes * 60}`, {
+                method: "PUT",
+            });
+        } catch (error) {
+            console.error("Failed to set pomodoro goal", error);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    return { setPomodoroGoal, loading };
 }
 
 export function useEditTask() {

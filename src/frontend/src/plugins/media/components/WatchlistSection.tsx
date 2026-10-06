@@ -27,7 +27,7 @@ export function WatchlistSection({
   return (
     <section className="flex flex-col gap-3">
       <h2 className="px-3 text-lg font-semibold text-foreground">My Watchlist</h2>
-      <div className="swiper-no-swiping flex max-w-full gap-3 overflow-x-auto overscroll-x-contain px-3 pb-2 touch-pan-x [scrollbar-width:thin]">
+      <div className="swiper-no-swiping flex max-w-full gap-3 overflow-x-auto overscroll-x-contain px-3 pb-2 touch-pan-x scrollbar-none">
         {watchlist.map((item) => {
           const releaseYear = item.release_date
             ? new Date(item.release_date).getFullYear()
