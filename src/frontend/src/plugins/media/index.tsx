@@ -1,5 +1,6 @@
 import { MediaPage } from "./MediaPage";
 import { ClapperboardIcon } from "lucide-react";
+import { CurrentlyPlayingCompanion } from "./components/CurrentlyPlayingCompanion";
 
 export default {
     id: 'media',
@@ -7,9 +8,10 @@ export default {
     icon: ClapperboardIcon,
     page: MediaPage,
     widgets: {
-        hero: null,
+        hero: CurrentlyPlayingCompanion,
         small: null,
-        wide: null
+        wide: null,
+        companion: CurrentlyPlayingCompanion
     },
     commandRenderers: {}
 }

@@ -16,6 +16,7 @@ export interface PluginManifest {
     hero: ComponentType | null
     small: ComponentType | null
     wide?: ComponentType | null
+    companion?: ComponentType | null
   }
 
   commandRenderers?: Partial<Record<string, ComponentType<{ data: any }>>>;

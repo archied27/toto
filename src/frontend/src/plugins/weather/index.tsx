@@ -5,6 +5,7 @@ import { pollenColour, pollenLabel, weatherColour, weatherIcon } from "./utils";
 import { Card } from "@/components/ui/card";
 import type { WeatherDaily } from "./useWeather";
 import { CloudSunIcon } from "lucide-react";
+import { WeatherCompanion } from "./components/WeatherCompanion";
 
 export default {
     id: 'weather',
@@ -14,7 +15,8 @@ export default {
     widgets: {
         hero: null,
         small: null,
-        wide: null
+        wide: null,
+        companion: WeatherCompanion
     },
     commandRenderers: {
         show_pollen: ({ data }) => {

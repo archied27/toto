@@ -83,14 +83,19 @@ class MediaController:
             except Exception:
                 continue
             state = result.get("state", result) if isinstance(result, dict) else {}
-            if state.get("status") not in {"playing", "paused"}:
+            # Check if we have valid media context (similar to update_streaming_progress)
+            media_type = (state.get("media_type") or "").lower()
+            tmdb_id = state.get("tmdb_id")
+            if media_type not in {"movie", "series"} or tmdb_id is None:
                 continue
             state = dict(state)
             state["agent_id"] = agent.device_id
             state["agent_name"] = agent.display_name or agent.device_id
             items.append(state)
 
-        return {"status": "success", "items": items}
+        result = {"status": "success", "items": items}
+        self.core.bus.emit_no_wait("media.playing.updated", result)
+        return result
 
     async def control(self, agent_id: str, action: str, payload: dict | None = None):
         """Dispatch a playback control to one connected media agent."""
@@ -136,7 +141,7 @@ class MediaController:
         await self.media_db.initialise()
         await self.update_state()
 
-        # Schedule progress updates for streaming sessions every 5 minutes
+        # Schedule progress updates for streaming sessions every 1 minute
         if self.core and getattr(self.core, "scheduler", None):
             self.core.scheduler.add_recurring(
                 "media.update_streaming_progress",

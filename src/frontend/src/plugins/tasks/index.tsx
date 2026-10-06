@@ -4,7 +4,6 @@ import { ListChecksIcon } from "lucide-react";
 import { NewTaskCreated, ShowTasksCommandResult } from "./TaskCommandResults";
 import TasksPage from "./TasksPage";
 import { TasksHero, TasksLong, TasksSmall } from "./TasksWidgets";
-
 export default {
     id: 'tasks',
     label: 'Tasks',
@@ -13,7 +12,8 @@ export default {
     widgets: {
         hero: TasksHero,
         small: TasksSmall,
-        wide: TasksLong
+        wide: TasksLong,
+        companion: TasksHero
     },
     commandRenderers: {
         today_tasks: ({ data }) => {

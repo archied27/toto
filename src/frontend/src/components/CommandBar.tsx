@@ -75,6 +75,8 @@ export default function CommandBar({
   onClose: () => void;
   longComponent?: React.ReactNode;
 }) {
+  // Show close button only in companion mode (when longComponent is provided)
+  const isCompanionMode = !!longComponent;
   const [searchTerm, setSearchTerm] = useState("");
   const [result, setResult] = useState<CommandResult | null>(null);
   const [streaming, setStreaming] = useState<{
@@ -179,7 +181,20 @@ export default function CommandBar({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-between pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-      <div className="flex-1 overflow-y-auto px-4 pt-4">
+      <div className="flex-1 overflow-y-auto px-4 {isCompanionMode ? 'pt-2' : 'pt-4'}">
+        {/* Close button in companion mode only */}
+        {isCompanionMode && (
+          <div className="flex justify-end items-start mb-2">
+            <button
+              onClick={onClose}
+              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              aria-label="Close"
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
         {/* A pending write confirmation sits at the top, replacing the
             long widget below so the dialog isn't buried under content. */}
         {pendingWrite && (

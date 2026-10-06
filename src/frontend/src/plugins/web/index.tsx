@@ -12,7 +12,8 @@ export default {
     widgets: {
         hero: null,
         small: null,
-        wide: null
+        wide: null,
+        companion: null
     },
     commandRenderers: {}
 } satisfies PluginManifest
