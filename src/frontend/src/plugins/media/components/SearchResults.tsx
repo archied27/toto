@@ -7,7 +7,7 @@ import MediaFilter, { type MediaType } from "./MediaFilter";
 
 export function SearchResults({ results, setSearchVisible, query, mediaType, onMediaTypeChange }: { results: HomePageResult[]; setSearchVisible: (visible: boolean) => void; query: string; mediaType: MediaType; onMediaTypeChange: (type: MediaType) => void }) {
     const [mediaSelected, setMediaSelected] = useState<number | null>(null);
-    const [mediaSelectedType, setMediaSelectedType] = useState<"movie" | "show" | null>(null);
+    const [mediaSelectedType, setMediaSelectedType] = useState<"movie" | "series" | null>(null);
 
     if (mediaSelected !== null) {
         if (mediaSelectedType === "movie") {
@@ -18,7 +18,7 @@ export function SearchResults({ results, setSearchVisible, query, mediaType, onM
                     }} />;
         }
 
-        if (mediaSelectedType === "show") {
+        if (mediaSelectedType === "series") {
             return <SeriesDetails seriesId={mediaSelected} 
                     close={() => {
                         setMediaSelected(null)

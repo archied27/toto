@@ -36,6 +36,8 @@ export default function SwipeNavigator({ pages, currentIndex, onPageChange }: Sw
             spaceBetween={15}
             resistanceRatio={0.85}
             cssMode={false}
+            noSwiping={true}
+            noSwipingClass="swiper-no-swiping"
             onSwiper={(swiper) => (swiperRef.current = swiper)}
             onSlideChange={(swiper) => {
                 setActiveIndex(swiper.activeIndex)

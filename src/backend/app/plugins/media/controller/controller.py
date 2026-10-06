@@ -2,21 +2,126 @@
 handles logic for media plugin
 """
 
-from app.plugins.media.controller.db import MPVDb
-from app.plugins.media.controller.mpv_socket_controller import MPVSocket
+from app.plugins.media.controller.media_db import MediaDb
 from app.plugins.media.controller.tmdb_controller import TMDBApiController
 from app.plugins.media.schemas import MPVState
 from app.core.core import Core
-from app.core.background_worker import Task
-import subprocess
 import json
-import os
 
-class MPVController:
+from datetime import datetime, timezone
+
+
+class MediaController:
     def __init__(self, core: Core):
         self.core = core
-        self.db = MPVDb(self.core.db_manager)
-        self.socket_manager = MPVSocket("/tmp/mpvsocket")
+        self.media_db = MediaDb(self.core.db_manager) if getattr(self.core, "db_manager", None) is not None else None
+        self._streaming_sessions: dict[str, tuple[str, int]] = {}
+
+    def _build_stream_url(self, media_type: str, tmdb_id: int, season_number: int | None = None, episode_number: int | None = None) -> str:
+        media_type = (media_type or "").lower()
+        if media_type in {"movie", "movies"}:
+            return f"https://www.movy.sx/movie/{tmdb_id}?play=true"
+        if media_type in {"series", "tv", "show"}:
+            if season_number is None or episode_number is None:
+                raise ValueError("Series streaming requires season_number and episode_number")
+            return f"https://www.movy.sx/tv/{tmdb_id}/{season_number}/{episode_number}?play=true"
+        raise ValueError(f"Unsupported media type: {media_type}")
+
+    async def stream(self, media_type: str, tmdb_id: int, season_number: int | None = None, episode_number: int | None = None, agent_id: str | None = None, start_seconds: int | None = None):
+        """Open the target title in a connected agent browser."""
+        if not self.core or not getattr(self.core, "agents", None):
+            return {"status": "error", "message": "No connected agents are available."}
+
+        try:
+            url = self._build_stream_url(media_type, tmdb_id, season_number, episode_number)
+            # Add timestamp fragment if start_seconds provided
+            if start_seconds is not None and start_seconds > 0:
+                url = f"{url}#t={start_seconds}"
+        except ValueError as exc:
+            return {"status": "error", "message": str(exc)}
+
+        registry = self.core.agents
+        connected = registry.list_media_agents()
+        eligible_agents = [
+            agent for agent in connected
+            if any(getattr(capability, "name", None) == "open_url" for capability in getattr(agent, "capabilities", []))
+        ]
+        if not eligible_agents:
+            return {"status": "error", "message": "No connected media agent can open browser streams."}
+
+        eligible_ids = {getattr(agent, "device_id", agent) for agent in eligible_agents}
+        if agent_id is None:
+            if len(eligible_agents) > 1:
+                return {"status": "error", "message": "Choose a media agent before starting the stream."}
+            agent_id = getattr(eligible_agents[0], "device_id", eligible_agents[0])
+        elif agent_id not in eligible_ids:
+            return {"status": "error", "message": f"Agent '{agent_id}' cannot open browser streams."}
+
+        try:
+            result = await registry.dispatch(agent_id, "open_url", {"url": url})
+        except TypeError:
+            result = await registry.dispatch(agent_id, "media", "open_url", {"url": url})
+        except Exception as exc:
+            return {"status": "error", "message": f"Failed to stream on agent '{agent_id}': {exc}"}
+
+        return {"status": "success", "agent_id": agent_id, "url": url, "result": result}
+
+    async def playing(self, agent_id: str | None = None):
+        """Return active browser playback sessions from media agents."""
+        registry = getattr(self.core, "agents", None)
+        if registry is None:
+            return {"status": "success", "items": []}
+
+        agents = registry.list_media_agents()
+        if agent_id is not None:
+            agents = [agent for agent in agents if agent.device_id == agent_id]
+
+        items = []
+        for agent in agents:
+            try:
+                result = await registry.dispatch(agent.device_id, "media_get_state", {})
+            except Exception:
+                continue
+            state = result.get("state", result) if isinstance(result, dict) else {}
+            if state.get("status") not in {"playing", "paused"}:
+                continue
+            state = dict(state)
+            state["agent_id"] = agent.device_id
+            state["agent_name"] = agent.display_name or agent.device_id
+            items.append(state)
+
+        return {"status": "success", "items": items}
+
+    async def control(self, agent_id: str, action: str, payload: dict | None = None):
+        """Dispatch a playback control to one connected media agent."""
+        registry = getattr(self.core, "agents", None)
+        if registry is None:
+            return {"status": "error", "message": "No connected agents are available."}
+
+        media_agents = {agent.device_id for agent in registry.list_media_agents()}
+        if agent_id not in media_agents:
+            return {"status": "error", "message": f"Media agent '{agent_id}' is not connected."}
+
+        try:
+            result = await registry.dispatch(agent_id, action, payload or {})
+        except Exception as exc:
+            return {"status": "error", "message": str(exc)}
+        if result.get("status") == "success" and action in {"media_pause", "media_toggle_pause"}:
+            await self.update_streaming_progress()
+        return result
+
+    async def play(self, media_type: str, tmdb_id: int, agent_id: str | None = None, season_number: int | None = None, episode_number: int | None = None, start_seconds: int | None = None):
+        """Compatibility wrapper; the current implementation streams via the agent browser."""
+        payload = {
+            "media_type": media_type,
+            "tmdb_id": tmdb_id,
+            "season_number": season_number,
+            "episode_number": episode_number,
+            "start_seconds": start_seconds,
+        }
+        if season_number is not None and episode_number is not None:
+            return await self.stream(media_type, tmdb_id, season_number=season_number, episode_number=episode_number, agent_id=agent_id)
+        return await self.stream(media_type, tmdb_id, agent_id=agent_id)
 
     async def update_state(self):
         new_state = MPVState()
@@ -28,17 +133,77 @@ class MPVController:
             data = json.load(json_f)
 
         self.tmdb = TMDBApiController(data["tmdb-api-key"])
-        self.movie_dirs = data["movie-dirs"]
-        self.series_dirs = data["series-dirs"]
-
-        self.core.bg_worker.register_handler("mpv.add_movies", self.add_movies)
-        self.core.bg_worker.register_handler("mpv.add_series", self.add_series)
-        self.core.bg_worker.register_handler("mpv.cleanup_db", self.cleanup_db)
-
-        await self.db.initialise_db()
+        await self.media_db.initialise()
         await self.update_state()
 
-    async def search_tmdb(self, query: str, media_type: str = "all"):
+        # Schedule progress updates for streaming sessions every 5 minutes
+        if self.core and getattr(self.core, "scheduler", None):
+            self.core.scheduler.add_recurring(
+                "media.update_streaming_progress",
+                self.update_streaming_progress,
+                minute="*/1"  # Every 1 minute
+            )
+
+    async def update_streaming_progress(self):
+        """Persist active agent positions and cache their TMDB metadata."""
+        if not self.media_db:
+            return
+
+        registry = getattr(self.core, "agents", None)
+        if registry is None:
+            return
+
+        for agent in registry.list_media_agents():
+            try:
+                result = await registry.dispatch(agent.device_id, "media_get_state", {})
+                state = result.get("state", result) if isinstance(result, dict) else {}
+                media_type = (state.get("media_type") or "").lower()
+                tmdb_id = state.get("tmdb_id")
+                if media_type not in {"movie", "series"} or tmdb_id is None:
+                    continue
+
+                tmdb_id = int(tmdb_id)
+                position = max(0, int(state.get("position_seconds") or 0))
+                duration = max(0, int(state.get("duration_seconds") or 0))
+                completed = state.get("status") == "completed" or (
+                    duration > 0 and position >= duration * 0.9
+                )
+                watched_at = datetime.now(timezone.utc)
+
+                await self.media_db.save_state(agent.device_id, {
+                    **state,
+                    "media_type": media_type,
+                    "tmdb_id": tmdb_id,
+                    "position_seconds": position,
+                    "duration_seconds": duration or None,
+                    "completed": completed,
+                    "updated_at": watched_at.isoformat(),
+                })
+
+                await self._get_cached_tmdb_details(media_type, tmdb_id)
+                await self.media_db.upsert_source(agent.device_id, {
+                    "media_type": media_type,
+                    "tmdb_id": tmdb_id,
+                    "season_number": state.get("season_number"),
+                    "episode_number": state.get("episode_number"),
+                    "duration_seconds": duration or None,
+                })
+            except Exception:
+                continue
+
+    async def _get_cached_tmdb_details(self, media_type: str, tmdb_id: int):
+        if await self.media_db.has_item(media_type, tmdb_id):
+            return None
+
+        try:
+            details = await self.get_item(media_type, tmdb_id)
+        except Exception:
+            return None
+        if details is not None:
+            await self.media_db.upsert_item(media_type, tmdb_id, details)
+        return details
+
+    async def search(self, query: str, media_type: str = "all"):
         """
         searches tmdb for movies and/or series matching the query
         """
@@ -56,6 +221,38 @@ class MPVController:
         """
         return await self.tmdb.get_series_details(id)
 
+    async def get_item(self, media_type: str, tmdb_id: int):
+        """Return TMDB details for the media item route."""
+        normalized_type = (media_type or "").lower()
+        normalized_type = "movie" if normalized_type in {"movie", "movies"} else "series" if normalized_type in {"series", "tv", "show"} else normalized_type
+        cached = await self.media_db.get_item(normalized_type, tmdb_id)
+        details = cached
+        if details is None:
+            details = await self.get_movie_details(tmdb_id) if normalized_type == "movie" else await self.get_series_details(tmdb_id)
+            if details is not None:
+                await self.media_db.upsert_item(normalized_type, tmdb_id, details)
+        if details is not None:
+            await self._attach_progress(normalized_type, tmdb_id, details)
+            return details
+        raise ValueError(f"Unsupported media type: {media_type}")
+
+    async def _attach_progress(self, media_type: str, tmdb_id: int, details: dict):
+        progress_rows = await self.media_db.get_progress(media_type, tmdb_id)
+        if media_type == "movie":
+            if progress_rows:
+                details.update(progress_rows[0])
+            return
+
+        progress_by_episode = {
+            (row["season_number"], row["episode_number"]): row
+            for row in progress_rows
+        }
+        for season_number, season in enumerate(details.get("seasons", []), start=1):
+            for episode in season.get("episodes", []):
+                progress = progress_by_episode.get((season_number, episode.get("episode_num")))
+                if progress:
+                    episode.update(progress)
+
     async def get_full_series_details(self, id: int):
         """
         fetches and returns series details with all seasons and episodes
@@ -69,184 +266,51 @@ class MPVController:
         series_details["seasons"] = seasons
         return series_details
 
-    async def update_db(self):
+    async def get_continue_watching(self):
         """
-        syncs the database with files on computer
-        background task
+        returns persisted progress for movies and episodes, ordered by last_watched
         """
-        await self.core.bg_worker.add_task("mpv.cleanup_db")
-
-        await self.core.bg_worker.add_task("mpv.add_series")
-        await self.core.bg_worker.add_task("mpv.add_movies")
-    
-    async def cleanup_db(self, task: Task):
-        """
-        removes all db entries where file no longer exists
-        """
-        await task.update(0.0, "Cleaning Up Movies...")
-        await self.cleanup_movies()
-        await task.update(0.5, "Cleaning Up Series...")
-        await self.cleanup_series()
-
-    def toggle_pause(self):
-        """
-        toggles pause status and does nothing if nothing being played
-        """
-        current = self.socket_manager.get_pause_status()
-        if current != None:
-            self.socket_manager.set_pause(not current)
-
-    def play(self, file_path: str, duration: int):
-        subprocess.Popen(["mpv", f"--start={duration}", file_path, "-fs", f"--input-ipc-server={self.socket_manager.socket}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-
-    async def get_being_played(self):
-        """
-        returns details about currently playing
-        """
-        file = self.socket_manager.get_current_file()
-        if file != None:
-            details = await self.db.get_details_from_path(file)
-            if details["type"] == "movie":
-                data = await self.db.get_movie(details["id"])
-
-                return {"media_type": "movie",
-                "title": data["title"], "release_year": data["release_date"].year,
-                "progress_seconds": data["progress_seconds"], "poster_path": data["poster_path"]}
-
-            elif details["type"] == "episode":
-                data = await self.db.get_episode_details(details["id"], details["season_number"],
-                details["episode_number"])
-
-                return {"media_type": "episode",
-                "title": data["title"], "episode_num": data["episode_num"], 
-                "season_num": data["season_num"], "duration_seconds": data["duration"],
-                "poster_path": data["poster_path"]}
-
-            else:
-                return None
-
-    async def cleanup_movies(self):
-        """
-        removes all movies from db if file not present
-        """
-        db_movies = await self.db.get_movies()
-        for movie in db_movies:
-            if not os.path.isfile(movie["file_path"]):
-                await self.db.delete_movie(movie["id"])
-
-    async def cleanup_series(self):
-        """
-        removes all episodes from db if file not present
-        if a season has no episodes, removes from db
-        if a series has no seasons, removes from db
-        """
-        db_episodes = await self.db.get_episodes()
-        for episode in db_episodes:
-            if not os.path.isfile(episode["file_path"]):
-                await self.db.delete_episode(episode["id"])
-                # if season has no episodes
-                # if len(await self.db.get_seasons_episodes(episode["season_id"])) == 0:
-                #     await self.db.delete_season(episode["season_id"])
-                #     # if series has no seasons
-                #     if len(await self.db.get_series_seasons(episode["series_id"])) == 0:
-                #         await self.db.delete_series()
-
-    async def get_all_movies(self):
-        """
-        returns array of all movies, sorted
-        """
-
-
-    async def add_movies(self, task: Task):
-        """
-        adds an array of all movies found to db
-        """
-        movies = []
-
-        for path in self.movie_dirs:
-            if os.path.isdir(path):
-                total_files = len([name for name in os.listdir(path) if ".mkv" in name])
-                count = 0
-                for f in os.listdir(path):
-                    if ".mkv" in f:
-                        if not (await self.db.get_movie(int(f[:-4]))):
-                            file = str(os.path.join(path, f))
-                            data = await self.tmdb.get_movie_details(int(f[:-4]))
-                            data["id"] = f[:-4]
-                            data["file_path"] = file
-                            data["duration_seconds"] = self.get_duration(file)
-                            movies.append(data)
-
-                            count+=1
-                            await task.update((count/total_files)*100, f"Found {data["title"]}")
-                        else:
-                            count+=1
-                            
-        await self.db.add_movies_bulk(movies)
-
-    async def add_series(self, task: Task):
-        """
-        adds all series to db
-        """
-        series = []
-
-        for path in self.series_dirs:
-            if os.path.isdir(path):
-
-                total_series = len([name for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))])
-                count = 0
-
-                for subpath in os.listdir(path):
-                    if os.path.isdir(os.path.join(path, subpath)):
-                        current_series = await self.tmdb.get_series_details(int(subpath))
-                        current_series["seasons"] = await self.get_seasons(str(os.path.join(path, subpath)), subpath)
-
-                        count+=1
-
-                        await task.update((count/total_series)*100, f"Found {current_series["title"]}")
-
-                        series.append(current_series)
-        
-        await self.db.add_series_bulk(series)
-
-    async def get_seasons(self, series_path: str, series_id: int):
-        """
-        returns array of seasons dicts
-        """
-        seasons = []
-        for subpath in os.listdir(series_path):
-            season, episodes = await self.tmdb.get_season_details(series_id, int(subpath))
-            season["season_number"] = int(subpath)
-            season["series_id"] = series_id
-            season["episodes"] = []
-
-            for ep in os.listdir(os.path.join(series_path, subpath)):
-                if os.path.isfile(os.path.join(series_path, subpath, ep)):
-                    episode = next((e for e in episodes if e["episode_num"] == int(ep[:-4])), None)
-
-                    if episode:
-                        episode["file_path"] = str(os.path.join(series_path, subpath, ep))
-                        episode["duration_seconds"] = self.get_duration(str(os.path.join(series_path, subpath, ep)))
-                        season["episodes"].append(episode)
-
-            seasons.append(season)
-        return seasons
-
-
-    def get_duration(self, filepath: str):
-        result = subprocess.run(
-            [
-                "ffprobe",
-                "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "json",
-                filepath
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
+        return await self.media_db.db.fetch_all(
+            """
+            SELECT
+                CASE WHEN p.media_type = 'movie' THEN p.tmdb_id ELSE p.rowid END AS id,
+                COALESCE(i.title, 'Unknown') AS title,
+                json_extract(i.metadata_json, '$.poster_path') AS poster_path,
+                p.duration_seconds,
+                p.position_seconds AS progress_seconds,
+                p.last_watched,
+                '' AS file_path,
+                CASE WHEN p.media_type = 'movie' THEN 'movie' ELSE 'episode' END AS media_type,
+                p.season_number,
+                p.episode_number,
+                CASE WHEN p.media_type = 'series' THEN p.tmdb_id END AS series_tmdb_id
+            FROM media_progress p
+            LEFT JOIN media_items i
+                ON i.media_type = p.media_type AND i.tmdb_id = p.tmdb_id
+            WHERE p.position_seconds > 0 AND p.completed = 0
+            ORDER BY p.last_watched DESC
+            """
         )
 
-        data = json.loads(result.stdout)
-        duration = float(data["format"]["duration"])
-        return int(duration)
+    async def add_to_watchlist(self, media_type: str, tmdb_id: int):
+        """Add a movie or series to the watchlist."""
+        await self.media_db.add_to_watchlist(media_type, tmdb_id)
+        await self._get_cached_tmdb_details(media_type, tmdb_id)
+        return {"status": "success", "message": "Added to watchlist"}
+
+    async def remove_from_watchlist(self, media_type: str, tmdb_id: int):
+        """Remove a movie or series from the watchlist."""
+        await self.media_db.remove_from_watchlist(media_type, tmdb_id)
+        return {"status": "success", "message": "Removed from watchlist"}
+
+    async def get_watchlist(self):
+        """Get all watchlist items."""
+        items = await self.media_db.get_watchlist()
+        for item in items:
+            item["in_watchlist"] = True
+        return items
+
+    async def check_watchlist_status(self, media_type: str, tmdb_id: int):
+        """Check if an item is in the watchlist."""
+        in_watchlist = await self.media_db.is_in_watchlist(media_type, tmdb_id)
+        return {"in_watchlist": in_watchlist}

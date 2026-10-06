@@ -1,17 +1,24 @@
 import { useEffect, useState } from "react";
-import { useGetSeriesDetails, type FullSeriesDetails, type SeasonDetails } from "../useMedia";
+import { useGetSeriesDetails, type FullSeriesDetails, type SeasonDetails, useWatchlist } from "../useMedia";
 import { isEpisodeAvailable, formatDuration, useDominantColor } from "../utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Cast, ChevronDown, Download, Play, X } from "lucide-react";
+import { Cast, ChevronDown, Play, X, Plus, Check } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { apiFetch } from "@/hooks/api";
+import { MediaAgentPicker, type MediaAgent } from "./MediaAgentPicker";
 
 export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: () => void }) {
     const { getSeriesDetails, loading } = useGetSeriesDetails(seriesId);
     const [seriesDetails, setSeriesDetails] = useState<FullSeriesDetails | null>(null);
     const [selectedSeason, setSelectedSeason] = useState<SeasonDetails | null>(null);
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const [pendingEpisode, setPendingEpisode] = useState<{ season: number; episode: number; startSeconds?: number } | null>(null);
+    const [streaming, setStreaming] = useState(false);
+    const { checkWatchlistStatus, addToWatchlist, removeFromWatchlist } = useWatchlist();
+    const [inWatchlist, setInWatchlist] = useState(false);
+    const [watchlistLoading, setWatchlistLoading] = useState(false);
 
 
     useEffect(() => {
@@ -24,24 +31,63 @@ export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: (
         fetchSeriesDetails();
     }, [getSeriesDetails]);
 
+    useEffect(() => {
+        const checkStatus = async () => {
+            const status = await checkWatchlistStatus("series", seriesId);
+            setInWatchlist(status);
+        };
+        checkStatus();
+    }, [seriesId, checkWatchlistStatus]);
+
+    const handleWatchlistToggle = async () => {
+        setWatchlistLoading(true);
+        try {
+            if (inWatchlist) {
+                await removeFromWatchlist("series", seriesId);
+                setInWatchlist(false);
+            } else {
+                await addToWatchlist("series", seriesId);
+                setInWatchlist(true);
+            }
+        } finally {
+            setWatchlistLoading(false);
+        }
+    };
+
     const posterUrl = seriesDetails?.poster_path
         ? `https://image.tmdb.org/t/p/w200${seriesDetails.poster_path}`
         : undefined;
     const dominantColor = useDominantColor(posterUrl);
 
-    const handleStreamEpisode = async (seasonNumber: number, episodeNumber: number) => {
+    const handleStreamEpisode = async (seasonNumber: number, episodeNumber: number, startSeconds?: number) => {
+        setPendingEpisode({ season: seasonNumber, episode: episodeNumber, startSeconds });
+        setPickerOpen(true);
+    };
+
+    const streamEpisodeOnAgent = async (agent: MediaAgent) => {
+        if (!pendingEpisode) return;
         try {
+            setStreaming(true);
+            const payload: Record<string, unknown> = {
+                media_type: "series",
+                tmdb_id: seriesId,
+                season_number: pendingEpisode.season,
+                episode_number: pendingEpisode.episode,
+                agent_id: agent.device_id,
+            };
+            // Include start_seconds if provided (for continue watching)
+            if (pendingEpisode.startSeconds !== undefined && pendingEpisode.startSeconds > 0) {
+                payload.start_seconds = Math.floor(pendingEpisode.startSeconds);
+            }
             await apiFetch("/media/stream", {
                 method: "POST",
-                body: JSON.stringify({
-                    media_type: "series",
-                    tmdb_id: seriesId,
-                    season_number: seasonNumber,
-                    episode_number: episodeNumber,
-                }),
+                body: JSON.stringify(payload),
             });
+            setPickerOpen(false);
         } catch (error) {
             console.error("Failed to start stream", error);
+        } finally {
+            setStreaming(false);
         }
     };
 
@@ -124,7 +170,7 @@ export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: (
 
                     <div className="flex gap-2.5 mb-6">
                         <Button
-                            variant="outline" 
+                            variant="outline"
                             className="flex-1 h-auto flex-col gap-1.5 py-3 rounded-2xl bg-white text-black hover:bg-white/90 shadow-sm active:scale-[0.97] transition-transform duration-150"
                         >
                             <Play className="w-[18px] h-[18px]" fill="white" strokeWidth={0} />
@@ -141,10 +187,18 @@ export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: (
 
                         <Button
                             variant="outline"
+                            onClick={handleWatchlistToggle}
+                            disabled={watchlistLoading}
                             className="flex-1 h-auto flex-col gap-1.5 py-3 rounded-2xl bg-white/[0.06] border border-white/10 text-white/90 hover:bg-white/10 hover:text-white active:scale-[0.97] transition-transform duration-150"
                         >
-                            <Download className="w-[18px] h-[18px]" strokeWidth={1.75} />
-                            <span className="text-[13px] text-white font-medium tracking-tight">Download</span>
+                            {inWatchlist ? (
+                                <Check className="w-[18px] h-[18px]" strokeWidth={1.75} />
+                            ) : (
+                                <Plus className="w-[18px] h-[18px]" strokeWidth={1.75} />
+                            )}
+                            <span className="text-[13px] text-white font-medium tracking-tight">
+                                {inWatchlist ? "In List" : "Watchlist"}
+                            </span>
                         </Button>
                     </div>
 
@@ -212,11 +266,30 @@ export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: (
                                         <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
                                             {episode.description}
                                         </p>
+                                        {episode.position_seconds !== undefined && episode.duration_seconds && (
+                                            <div className="mt-2">
+                                                <div className="mb-1 flex justify-between text-[10px] text-muted-foreground">
+                                                    <span>In progress</span>
+                                                    <span>{formatDuration(Math.max(0, episode.duration_seconds - episode.position_seconds))} left</span>
+                                                </div>
+                                                <div className="h-1 overflow-hidden rounded-full bg-white/10">
+                                                    <div
+                                                        className="h-full bg-primary"
+                                                        style={{ width: `${Math.min((episode.position_seconds / episode.duration_seconds) * 100, 100)}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {available && (
                                         <Button
-                                            onClick={() => handleStreamEpisode(seasonNumber, episode.episode_num)}
+                                            onClick={() => handleStreamEpisode(
+                                                seasonNumber,
+                                                episode.episode_num,
+                                                episode.position_seconds
+                                            )}
+                                            disabled={streaming}
                                             variant="ghost"
                                             size="icon"
                                             className="shrink-0 self-center mr-3 h-9 w-9 rounded-full bg-white/[0.06] text-white/90 hover:bg-white/10 hover:text-white"
@@ -231,6 +304,11 @@ export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: (
 
                 </div>
             </div>
+            <MediaAgentPicker
+                open={pickerOpen}
+                onOpenChange={setPickerOpen}
+                onSelect={streamEpisodeOnAgent}
+            />
         </div>
     );
 }

@@ -1,6 +1,6 @@
 from app.schemas.base_plugin import BasePlugin
 from app.plugins.media.routes import MediaRouter
-from app.plugins.media.controller.media_controller import MediaController
+from app.plugins.media.controller.controller import MediaController
 from app.plugins.media.state import MediaState
 
 class MediaPlugin(BasePlugin):

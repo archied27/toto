@@ -228,6 +228,7 @@ async def get_agents():
                 "description": device.description,
                 "icon": device.icon,
                 "connected_at": device.connected_at.isoformat(),
+                "media_capability": device.media_capability,
                 "capabilities": [
                     {
                         "name": cap.name,

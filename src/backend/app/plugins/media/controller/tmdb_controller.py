@@ -45,7 +45,7 @@ class TMDBApiController:
 
             elif result_type == "tv":
                 results.append({"id": result["id"], "title": result["name"], "poster_path": result["poster_path"],
-                "media_type": "show", "release_date": result["first_air_date"], "release_type": 6})
+                "media_type": "series", "release_date": result["first_air_date"], "release_type": 6})
         return results
 
     async def get_movie_details(self, id: int):

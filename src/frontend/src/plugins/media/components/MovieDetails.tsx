@@ -1,15 +1,21 @@
 import { useState, useEffect } from "react";
-import { X, Play, Download, Cast } from "lucide-react";
-import { useGetMovieDetails, type MovieDetails } from "../useMedia";
+import { X, Play, Cast, Plus, Check } from "lucide-react";
+import { useGetMovieDetails, type MovieDetails, useWatchlist } from "../useMedia";
 import { getReleaseTypeDescription, useDominantColor } from "../utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { apiFetch } from "@/hooks/api";
+import { MediaAgentPicker, type MediaAgent } from "./MediaAgentPicker";
 
 export function MovieDetails({ movieId, close }: { movieId: number; close?: () => void }) {
     const { getMovieDetails, loading } = useGetMovieDetails(movieId);
     const [movieDetails, setMovieDetails] = useState<MovieDetails | null>(null);
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const [streaming, setStreaming] = useState(false);
+    const { checkWatchlistStatus, addToWatchlist, removeFromWatchlist } = useWatchlist();
+    const [inWatchlist, setInWatchlist] = useState(false);
+    const [watchlistLoading, setWatchlistLoading] = useState(false);
 
     useEffect(() => {
         const fetchMovieDetails = async () => {
@@ -20,17 +26,54 @@ export function MovieDetails({ movieId, close }: { movieId: number; close?: () =
         fetchMovieDetails();
     }, [getMovieDetails]);
 
-    const handleStream = async () => {
+    useEffect(() => {
+        const checkStatus = async () => {
+            const status = await checkWatchlistStatus("movie", movieId);
+            setInWatchlist(status);
+        };
+        checkStatus();
+    }, [movieId, checkWatchlistStatus]);
+
+    const handleWatchlistToggle = async () => {
+        setWatchlistLoading(true);
         try {
+            if (inWatchlist) {
+                await removeFromWatchlist("movie", movieId);
+                setInWatchlist(false);
+            } else {
+                await addToWatchlist("movie", movieId);
+                setInWatchlist(true);
+            }
+        } finally {
+            setWatchlistLoading(false);
+        }
+    };
+
+    const handleStream = async (agent?: MediaAgent) => {
+        if (!agent) {
+            setPickerOpen(true);
+            return;
+        }
+        try {
+            setStreaming(true);
+            // Resume from stored position if there's progress
+            const startSeconds = (movieDetails?.position_seconds ?? 0) > 0
+                ? Math.floor(movieDetails?.position_seconds ?? 0)
+                : undefined;
             await apiFetch("/media/stream", {
                 method: "POST",
                 body: JSON.stringify({
                     media_type: "movie",
                     tmdb_id: movieId,
+                    agent_id: agent.device_id,
+                    start_seconds: startSeconds,
                 }),
             });
+            setPickerOpen(false);
         } catch (error) {
             console.error("Failed to start stream", error);
+        } finally {
+            setStreaming(false);
         }
     };
 
@@ -53,6 +96,12 @@ export function MovieDetails({ movieId, close }: { movieId: number; close?: () =
         : null;
 
     const durationString = `${Math.floor(movieDetails.duration_seconds / 3600)}h ${Math.floor((movieDetails.duration_seconds % 3600) / 60)}mins`;
+    const hasProgress = (movieDetails.position_seconds ?? 0) > 0;
+    const progressPercent = hasProgress
+        ? Math.min(((movieDetails.position_seconds ?? 0) / movieDetails.duration_seconds) * 100, 100)
+        : 0;
+    const secondsLeft = Math.max(0, movieDetails.duration_seconds - (movieDetails.position_seconds ?? 0));
+    const timeLeft = `${Math.floor(secondsLeft / 3600)}h ${Math.floor((secondsLeft % 3600) / 60)}mins left`;
 
     return (
         <div className="relative bg-black min-h-dvh overflow-hidden">
@@ -116,7 +165,8 @@ export function MovieDetails({ movieId, close }: { movieId: number; close?: () =
                         </Button>
                         <Button
                             variant="outline"
-                            onClick={handleStream}
+                            onClick={() => handleStream()}
+                            disabled={streaming}
                             className="flex-1 h-auto flex-col gap-1.5 py-3 rounded-2xl bg-white/[0.06] border border-white/10 text-white/90 hover:bg-white/10 hover:text-white active:scale-[0.97] transition-transform duration-150"
                         >
                             <Cast className="w-[18px] h-[18px]" strokeWidth={1.75} />
@@ -124,10 +174,18 @@ export function MovieDetails({ movieId, close }: { movieId: number; close?: () =
                         </Button>
                         <Button
                             variant="outline"
+                            onClick={handleWatchlistToggle}
+                            disabled={watchlistLoading}
                             className="flex-1 h-auto flex-col gap-1.5 py-3 rounded-2xl bg-white/[0.06] border border-white/10 text-white/90 hover:bg-white/10 hover:text-white active:scale-[0.97] transition-transform duration-150"
                         >
-                            <Download className="w-[18px] h-[18px]" strokeWidth={1.75} />
-                            <span className="text-[13px] font-medium tracking-tight">Download</span>
+                            {inWatchlist ? (
+                                <Check className="w-[18px] h-[18px]" strokeWidth={1.75} />
+                            ) : (
+                                <Plus className="w-[18px] h-[18px]" strokeWidth={1.75} />
+                            )}
+                            <span className="text-[13px] font-medium tracking-tight">
+                                {inWatchlist ? "In List" : "Watchlist"}
+                            </span>
                         </Button>
                     </div>
 
@@ -148,6 +206,17 @@ export function MovieDetails({ movieId, close }: { movieId: number; close?: () =
                                     <p className="text-sm text-foreground">{release_type}</p>
                                 </Button>
                             )}
+                            {hasProgress && (
+                                <div className="mb-3 w-full max-w-md">
+                                    <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                                        <span>In progress</span>
+                                        <span>{timeLeft}</span>
+                                    </div>
+                                    <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                                        <div className="h-full bg-primary" style={{ width: `${progressPercent}%` }} />
+                                    </div>
+                                </div>
+                            )}
                             <p className="text-sm leading-relaxed text-gray-300">
                                 {movieDetails.description || "No description available for this movie."}
                             </p>
@@ -155,6 +224,11 @@ export function MovieDetails({ movieId, close }: { movieId: number; close?: () =
                     </Card>
                 </div>
             </div>
+            <MediaAgentPicker
+                open={pickerOpen}
+                onOpenChange={setPickerOpen}
+                onSelect={handleStream}
+            />
         </div>
     );
 }

@@ -15,6 +15,64 @@ export default function CompanionMode({ onOpenCommandBar }: CompanionModeProps) 
 
   const [widgetSlots, setWidgetSlots] = useState<(WidgetSlot | null)[]>([]);
 
+  // Keep the screen awake while Companion Mode is active
+  useEffect(() => {
+    let wakeLock: WakeLockSentinel | null = null;
+
+    const requestWakeLock = async () => {
+      try {
+        if (
+          "wakeLock" in navigator &&
+          document.visibilityState === "visible"
+        ) {
+          // Release any previous lock before requesting a new one
+          if (wakeLock) {
+            await wakeLock.release();
+            wakeLock = null;
+          }
+
+          wakeLock = await navigator.wakeLock.request("screen");
+
+          console.log("Companion Mode: screen wake lock enabled");
+
+          wakeLock.addEventListener("release", () => {
+            console.log("Companion Mode: screen wake lock released");
+          });
+        }
+      } catch (error) {
+        console.error(
+          "Companion Mode: failed to acquire screen wake lock:",
+          error
+        );
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        requestWakeLock();
+      }
+    };
+
+    // Request wake lock when Companion Mode starts
+    requestWakeLock();
+
+    // Browsers release the wake lock when the page becomes hidden.
+    // Re-acquire it when the user comes back.
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
+
+      if (wakeLock) {
+        wakeLock.release();
+        wakeLock = null;
+      }
+    };
+  }, []);
+
   useEffect(() => {
     const resolvedSlots = [
       resolveSlot(slots.hero, "hero"),
@@ -22,6 +80,7 @@ export default function CompanionMode({ onOpenCommandBar }: CompanionModeProps) 
       resolveSlot(slots.small_a, "small"),
       resolveSlot(slots.small_b, "small"),
     ];
+
     setWidgetSlots(resolvedSlots);
   }, [slots]);
 
@@ -49,6 +108,7 @@ export default function CompanionMode({ onOpenCommandBar }: CompanionModeProps) 
                   {hero.component}
                 </div>
               )}
+
               {/* Wide widget below hero if it exists */}
               {wide && (
                 <div className="h-24 shrink-0">
@@ -65,6 +125,7 @@ export default function CompanionMode({ onOpenCommandBar }: CompanionModeProps) 
                     {smallA.component}
                   </div>
                 )}
+
                 {smallB && (
                   <div className="flex-1 min-h-0">
                     {smallB.component}

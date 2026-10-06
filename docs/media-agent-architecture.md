@@ -16,6 +16,7 @@ The important distinction is:
 - **The media plugin is the authority for the combined view.** It should not make
   the frontend or the LLM join TMDB results, agent capabilities, and playback
   responses itself.
+- Each agent only exposes in terms of id's, for example, an agent can say I have these ids which are movies on file, and these episodes of this tv show id, and then playback is in these terms, so backend says play movie with id n, which the agent then resolves. All tmdb related things happen on the backend, not the agent side.
 
 This removes the backend's local MPV responsibility entirely while allowing a
 laptop, desktop, NAS, or future remote player to expose the same media contract.
