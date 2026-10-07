@@ -33,6 +33,7 @@ class TasksRouter:
         self.router.add_api_route("/toggle_task_completion/{task_id}", self.toggle_task_completion, methods=["PUT"])
         self.router.add_api_route("/start_work/{task_id}", self.start_work, methods=["PUT"])
         self.router.add_api_route("/stop_work/{task_id}", self.stop_work, methods=["PUT"])
+        self.router.add_api_route("/reset_work/{task_id}", self.reset_work, methods=["PUT"])
         self.router.add_api_route("/set_pomodoro_goal/{task_id}", self.set_pomodoro_goal, methods=["PUT"])
         
     async def add_task(self, task: CreateTask):
@@ -122,6 +123,10 @@ class TasksRouter:
     async def stop_work(self, task_id: str):
         await self.controller.stop_work(task_id)
         return {"message": "Stopped working on task successfully"}
+
+    async def reset_work(self, task_id: str):
+        await self.controller.reset_work(task_id)
+        return {"message": "Work timer reset successfully"}
 
     async def set_pomodoro_goal(self, task_id: str, goal_seconds: int):
         await self.controller.set_pomodoro_goal(task_id, goal_seconds)

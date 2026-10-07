@@ -240,6 +240,44 @@
   animation: task-leave 0.25s ease-in forwards;
 }
 
+@keyframes page-priority-change {
+  0% { opacity: 0.72; transform: scale(0.985); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.animate-page-priority-change {
+  animation: page-priority-change 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes pomodoro-enter {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-pomodoro-enter {
+  animation: pomodoro-enter 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes pomodoro-icon {
+  from { opacity: 0; transform: scale(0.7) rotate(-12deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+.animate-pomodoro-icon {
+  display: inline-flex;
+  animation: pomodoro-icon 0.22s ease-out both;
+}
+
+@keyframes pomodoro-time {
+  from { opacity: 0.55; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-pomodoro-time {
+  display: inline-block;
+  animation: pomodoro-time 0.25s ease-out both;
+}
+
 /* Markdown code fence syntax highlighting (rehype-highlight token classes).
    Tuned for the dark CodeBlock background in MarkdownRenderer. */
 .hljs-comment,

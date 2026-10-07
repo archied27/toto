@@ -34,6 +34,7 @@ export interface TaskState {
     overdue_tasks: Task[];
     today_tasks: Task[];
     tasks_due_today: Task[];
+    active_tasks: Task[];
 }
 
 export type SweepDirection = "complete" | "incomplete";
@@ -382,6 +383,25 @@ export function useStopWork() {
     }, []);
 
     return { stopWork, loading };
+}
+
+export function useResetWork() {
+    const [loading, setLoading] = useState(false);
+
+    const resetWork = useCallback(async (taskId: number) => {
+        setLoading(true);
+        try {
+            await apiFetch(`/tasks/reset_work/${taskId}`, {
+                method: "PUT",
+            });
+        } catch (error) {
+            console.error("Failed to reset work timer", error);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    return { resetWork, loading };
 }
 
 export function useSetPomodoroGoal() {

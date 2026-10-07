@@ -588,12 +588,47 @@ export function HabitsSmall() {
 }
 
 export function HabitsLong() {
-    const { navigate } = useNavigation();
-    const state = useHabitsDashboardState();
-    const habits = state?.today?.filter((item) => item.status !== "rest" && item.status !== "not_due").slice(0, 5) ?? [];
-    const remaining = state?.due_today ?? 0;
-    const topStreak = state?.current_streaks?.[0];
-    return <WidgetContainer onClick={() => navigate("habits")} className="cursor-pointer"><div className="flex h-full min-w-0 items-center gap-3 overflow-hidden"><div className="flex shrink-0 items-center gap-2 border-r border-border/70 pr-3"><span className="text-xs font-semibold">Today</span><span className="text-xs font-bold text-amber-300">{remaining} left</span></div><div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">{habits.length ? habits.map((item) => <div key={item.habit.id} className="flex min-w-0 flex-1 items-center gap-1.5"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: habitColour(item.habit) }} /><span className="truncate text-xs">{item.habit.name}</span><span className={cn("shrink-0 text-[10px]", item.status === "completed" ? "text-emerald-300" : item.status === "missed" ? "text-rose-300" : "text-muted-foreground")}>{item.status === "completed" ? "Done" : item.status === "missed" ? "Missed" : "Open"}</span></div>) : <span className="text-xs text-muted-foreground">Nothing scheduled today</span>}</div><div className="flex shrink-0 items-center gap-1 border-l border-border/70 pl-3 text-xs text-amber-300"><Flame className="size-3.5" /><span>{topStreak ? `${topStreak.current_streak}d` : "0d"}</span></div></div></WidgetContainer>;
+  const { navigate } = useNavigation();
+  const state = useHabitsDashboardState();
+
+  const todo = (state?.today ?? [])
+    .filter((item) => item.status === "due")
+    .slice(0, 5);
+
+  const remaining = state?.due_today ?? todo.length;
+  const streak = state?.current_streaks?.[0]?.current_streak ?? 0;
+
+  return (
+    <WidgetContainer onClick={() => navigate("habits")} className="cursor-pointer">
+      <div className="flex h-full min-w-0 items-center gap-4 overflow-hidden">
+        <div className="flex shrink-0 items-baseline gap-1.5">
+          <span className="text-sm font-semibold text-amber-300">{remaining}</span>
+          <span className="text-xs text-muted-foreground">left today</span>
+        </div>
+
+        <div className="flex min-w-0 flex-1 items-center gap-4 overflow-hidden">
+          {todo.length ? (
+            todo.map((item) => (
+              <div key={item.habit.id} className="flex min-w-0 items-center gap-1.5">
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: habitColour(item.habit) }}
+                />
+                <span className="truncate text-xs">{item.habit.name}</span>
+              </div>
+            ))
+          ) : (
+            <span className="text-xs text-muted-foreground">All done for today 🎉</span>
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+          <Flame className="size-3.5 text-amber-300" />
+          <span>{streak}d</span>
+        </div>
+      </div>
+    </WidgetContainer>
+  );
 }
 
 interface HabitsDashboardState {

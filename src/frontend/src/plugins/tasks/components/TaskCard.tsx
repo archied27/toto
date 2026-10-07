@@ -1,9 +1,9 @@
 import { Card } from "@/components/ui/card";
-import { useDeleteTask, useToggleTaskCompletion, useStartWork, useStopWork, useSetPomodoroGoal, type SweepDirection, type Task } from "../useTasks";
+import { useDeleteTask, useToggleTaskCompletion, useStartWork, useStopWork, useResetWork, type SweepDirection, type Task } from "../useTasks";
 import { format, isToday, isTomorrow, isYesterday ,isThisWeek, parseISO, startOfWeek, endOfWeek, addWeeks } from "date-fns";
 import { getTextColour } from "../utils";
 import { Button } from "@/components/ui/button";
-import { CircleCheckIcon, CircleIcon, EditIcon, TrashIcon, PlayIcon, PauseIcon, TimerIcon, CheckIcon } from "lucide-react";
+import { CircleCheckIcon, CircleIcon, EditIcon, TrashIcon, PlayIcon, PauseIcon, SquareIcon, TimerIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import EditTask from "./EditTask";
 import { useEffect, useState } from "react";
@@ -50,7 +50,7 @@ export default function TaskCard({ task, refresh, className, onSweepingChange }:
     const { deleteTask } = useDeleteTask();
     const { startWork } = useStartWork();
     const { stopWork } = useStopWork();
-    const { setPomodoroGoal } = useSetPomodoroGoal();
+    const { resetWork } = useResetWork();
 
     const [editOpen, setEditOpen] = useState(false);
     const [sweeping, setSweeping] = useState<SweepDirection | null>(null);
@@ -66,8 +66,6 @@ export default function TaskCard({ task, refresh, className, onSweepingChange }:
         ? Math.max(0, Math.floor((now - new Date(task.work_session_start).getTime()) / 1000))
         : 0;
     const totalSeconds = (task.time_spent ?? 0) + sessionSeconds;
-    const pomodoroGoal = task.pomodoro_goal || 1500;
-    const progress = Math.min(100, (totalSeconds / pomodoroGoal) * 100);
 
     const handleToggle = async (e: React.MouseEvent<HTMLButtonElement>) => {
         e.stopPropagation();
@@ -95,6 +93,12 @@ export default function TaskCard({ task, refresh, className, onSweepingChange }:
     const handleStopWork = async (e: React.MouseEvent<HTMLButtonElement>) => {
         e.stopPropagation();
         await stopWork(task.id);
+        refresh();
+    };
+
+    const handleResetWork = async (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
+        await resetWork(task.id);
         refresh();
     };
 
@@ -126,7 +130,7 @@ export default function TaskCard({ task, refresh, className, onSweepingChange }:
                             )}
                         </Button>
                         {task.is_working ? (
-                            <Button onClick={handleStopWork} size={"icon"} className="self-center bg-muted h-8 w-8 border-2 border-border">
+                            <Button onClick={handleStopWork} aria-label="Pause work timer" title="Pause work timer" size={"icon"} className="self-center bg-muted h-8 w-8 border-2 border-border">
                                 <PauseIcon className="w-4 h-4 text-yellow-400" />
                             </Button>
                         ) : (
@@ -145,27 +149,6 @@ export default function TaskCard({ task, refresh, className, onSweepingChange }:
                             {task.to_do_date && task.due_date && <span className="text-xs text-muted-foreground text-bold mx-1">|</span>}
                             <span className="text-xs text-muted-foreground">{task.due_date && "Due " + formatTaskDate(task.due_date)}</span>
                         </div>
-
-                        {(task.is_working || totalSeconds > 0) && (
-                            <div className="mt-2 rounded-lg border border-border/50 bg-muted/30 px-2.5 py-2">
-                                <div className="flex items-center justify-between gap-2 text-xs">
-                                    <span className={`inline-flex items-center gap-1.5 font-medium ${task.is_working ? "text-blue-400" : "text-muted-foreground"}`}>
-                                        <TimerIcon className={`h-3.5 w-3.5 ${task.is_working ? "animate-pulse" : ""}`} />
-                                        {task.is_working ? "Focus session" : "Time tracked"}
-                                    </span>
-                                    <span className="tabular-nums text-muted-foreground">
-                                        {formatDuration(totalSeconds)}
-                                        {task.is_working && ` / ${formatDuration(pomodoroGoal)}`}
-                                    </span>
-                                </div>
-                                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                                    <div
-                                        className={`h-full rounded-full transition-[width] duration-1000 ${progress >= 100 ? "bg-emerald-500" : "bg-blue-500"}`}
-                                        style={{ width: `${progress}%` }}
-                                    />
-                                </div>
-                            </div>
-                        )}
 
                         <div className="flex flex-row flex-wrap gap-1">
                             {task.task_list && (
@@ -221,30 +204,28 @@ export default function TaskCard({ task, refresh, className, onSweepingChange }:
                         <div>
                             <p className="text-sm font-semibold">Focus timer</p>
                             <p className="text-xs text-muted-foreground">
-                                {task.is_working ? `${formatDuration(totalSeconds)} elapsed` : `${formatDuration(task.time_spent ?? 0)} tracked`}
+                                {task.is_working ? `${formatDuration(totalSeconds)} in the current session` : `${formatDuration(task.time_spent ?? 0)} completed`}
                             </p>
                         </div>
+                        <div className="flex items-center gap-2">
                         <Button variant={task.is_working ? "outline" : "default"} size="sm" onClick={task.is_working ? handleStopWork : handleStartWork}>
                             {task.is_working ? <PauseIcon className="mr-1.5 h-4 w-4" /> : <PlayIcon className="mr-1.5 h-4 w-4" />}
                             {task.is_working ? "Pause" : "Start"}
                         </Button>
-                    </div>
-                    <div className="mt-3 flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Goal</span>
-                        {[15, 25, 50].map(minutes => (
-                            <Button
-                                key={minutes}
-                                variant={pomodoroGoal === minutes * 60 ? "secondary" : "ghost"}
-                                size="xs"
-                                onClick={async () => {
-                                    await setPomodoroGoal(task.id, minutes);
-                                    refresh();
-                                }}
-                            >
-                                {pomodoroGoal === minutes * 60 && <CheckIcon className="mr-1 h-3 w-3" />}
-                                {minutes}m
+                        {(task.is_working || (task.time_spent ?? 0) > 0) && (
+                            <Button variant="destructive" size="sm" onClick={handleResetWork}>
+                                <SquareIcon className="mr-1.5 h-4 w-4" />
+                                Stop
                             </Button>
-                        ))}
+                        )}
+                        </div>
+                    </div>
+                    <div className="mt-3 flex items-center gap-2 rounded-lg border border-border/50 bg-background/40 px-3 py-2">
+                        <TimerIcon className={`h-4 w-4 ${task.is_working ? "animate-pulse text-blue-400" : "text-muted-foreground"}`} />
+                        <div>
+                            <p className="text-xs font-medium text-foreground">Focus completed</p>
+                            <p className="text-xs text-muted-foreground">{formatDuration(task.time_spent ?? 0)} of focused work already done</p>
+                        </div>
                     </div>
                 </div>
 

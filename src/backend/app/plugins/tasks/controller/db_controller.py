@@ -313,6 +313,18 @@ class TasksDBController:
             (new_time_spent, task_id)
         )
 
+    async def reset_work(self, task_id: int):
+        await self.core.db_manager.execute(
+            """
+            UPDATE tasks_tasks
+            SET is_working = 0,
+                work_session_start = NULL,
+                time_spent = 0
+            WHERE id = ?
+            """,
+            (task_id,)
+        )
+
     async def set_pomodoro_goal(self, task_id: int, goal_seconds: int):
         await self.core.db_manager.execute(
             "UPDATE tasks_tasks SET pomodoro_goal = ? WHERE id = ?",

@@ -52,3 +52,4 @@ class TasksState(BaseModel):
     overdue_tasks: list[Task] = Field(default_factory=list)
     today_tasks: list[Task] = Field(default_factory=list)
     tasks_due_today: list[Task] = Field(default_factory=list)
+    active_tasks: list[Task] = Field(default_factory=list)

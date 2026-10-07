@@ -9,6 +9,7 @@ import AddTask from "./components/AddTask";
 import TaskFilter from "./components/TaskFilter";
 import ActiveFilters from "./components/ActiveFilters";
 import { useNavigation } from "@/hooks/NavigationContext";
+import { PomodoroTimer } from "./TasksWidgets";
 
 // Orders tasks by the date they should be worked on: to_do_date first, falling
 // back to due_date when there's no to-do date. Undated tasks go last.
@@ -115,6 +116,17 @@ export default function TasksPage() {
         ...completingSweeps.filter(s => !inMainList(s.task.id)).map(s => s.task),
     ];
 
+    const focusTasks = [
+        ...(taskState?.active_tasks || []),
+        ...(taskState?.overdue_tasks || []),
+        ...(taskState?.tasks_due_today || []),
+        ...(taskState?.today_tasks || []),
+        ...currentTasks,
+    ].filter((task, index, tasks) =>
+        tasks.findIndex(candidate => candidate.id === task.id) === index
+    );
+    const focusedTask = focusTasks.find(task => task.is_working) ?? null;
+
     const completedTasks = dedupedTasks.filter(task =>
         sweeps[task.id]?.direction === "incomplete"
         || (
@@ -204,6 +216,17 @@ export default function TasksPage() {
 
                 <div className={`${addTaskPageOpen ? "opacity-50 blur pointer-events-none" : ""} gap-5 pt-5 flex flex-col flex-1 transition-opacity`}>
                     <Hero selected={currentTab} total={dedupedTasks.length} completed={completedTasks.length} handleAddTask={() => setAddTaskPageOpen(true)} />
+                    {focusedTask && (
+                        <section className="overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-card shadow-sm">
+                            <div className="p-4 sm:p-5">
+                                <PomodoroTimer
+                                    tasks={focusTasks}
+                                    initialTaskId={focusedTask.id}
+                                    onStop={() => getTasks()}
+                                />
+                            </div>
+                        </section>
+                    )}
                     <TaskTabs currentTab={currentTab} onTabChange={handleTabChange} />
 
                     {filtersActive && (

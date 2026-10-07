@@ -19,9 +19,10 @@ class TasksController:
         await self.db_controller.create_tables()
         await self.update_state()
         self.core.bus.on("tasks.update_state", self.update_state)
-        self.core.scheduler.add_recurring("tasks.update_state", hour="*/1") # update the state every hour 
+        self.core.scheduler.add_recurring("tasks.update_state", hour="*/1") # update the state every hour
 
     async def update_state(self):
+        all_tasks = await self.db_controller.get_all_tasks()
         # get all tasks that are overdue
         overdue_tasks = await self.db_controller.get_overdue_tasks()
         # get all tasks that are due today
@@ -35,7 +36,8 @@ class TasksController:
             base_priority=50,
             overdue_tasks=overdue_tasks,
             today_tasks=todays_tasks,
-            tasks_due_today=tasks_due_today
+            tasks_due_today=tasks_due_today,
+            active_tasks=[task for task in all_tasks if task.is_working],
         )
 
         old_state = self.core.state.get("tasks")
@@ -56,13 +58,18 @@ class TasksController:
         return state
 
     async def get_current_priority(self) -> int:
+        # Check if any task is currently being worked on (timer active)
+        all_tasks = await self.db_controller.get_all_tasks()
+        if any(task.is_working for task in all_tasks):
+            return 95
+
         overdue_tasks = await self.db_controller.get_overdue_tasks()
         tasks_due_today = await self.db_controller.get_today_due_tasks()
         tasks_set_today = await self.db_controller.get_todays_tasks()
         priority = 0
-        priority += len(overdue_tasks) * 40
-        priority += len([task for task in tasks_due_today if not task.completed]) * 30
-        priority += len([task for task in tasks_set_today if not task.completed]) * 20
+        priority += len(overdue_tasks) * 45
+        priority += len([task for task in tasks_due_today if not task.completed]) * 35
+        priority += len([task for task in tasks_set_today if not task.completed]) * 35
         return min(priority, 100)
 
     async def add_task(self, task: CreateTask):
@@ -82,9 +89,9 @@ class TasksController:
 
     async def delete_task(self, task_id: str):
         # delete a task from the database
-        await self.db_controller.delete_task(task_id)   
+        await self.db_controller.delete_task(task_id)
         await self.update_state()
-    
+
     async def get_all_tasks(self) -> list[Task]:
         # get all tasks from the database
         return await self.db_controller.get_all_tasks()
@@ -93,7 +100,7 @@ class TasksController:
         # add a task list to the database
         await self.db_controller.add_list(task_list)
         await self.update_state()
-        
+
     async def get_list(self, list_id: str) -> TaskList:
         # get a task list from the database
         return await self.db_controller.get_list(list_id)
@@ -181,6 +188,10 @@ class TasksController:
     async def stop_work(self, task_id: str):
         # stop working on a task
         await self.db_controller.stop_work(int(task_id))
+        await self.update_state()
+
+    async def reset_work(self, task_id: str):
+        await self.db_controller.reset_work(int(task_id))
         await self.update_state()
 
     async def set_pomodoro_goal(self, task_id: str, goal_seconds: int):

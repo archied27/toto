@@ -17,14 +17,32 @@ interface SwipeNavigatorProps {
 export default function SwipeNavigator({ pages, currentIndex, onPageChange }: SwipeNavigatorProps)
 {
     const [activeIndex, setActiveIndex] = useState(0)
+    const [isPriorityChanging, setIsPriorityChanging] = useState(false)
 
     const swiperRef = useRef<SwiperType | null>(null)
+    const pageSignature = pages.map(page => page.id).join("|")
+    const previousPageSignature = useRef(pageSignature)
 
     useEffect(() => {
         if (swiperRef.current && swiperRef.current.activeIndex !== currentIndex) {
             swiperRef.current.slideTo(currentIndex)
         }
     }, [currentIndex])
+
+    useEffect(() => {
+        if (previousPageSignature.current === pageSignature) return
+
+        previousPageSignature.current = pageSignature
+        let animationTimer: number | undefined
+        const animationStartTimer = window.setTimeout(() => {
+            setIsPriorityChanging(true)
+            animationTimer = window.setTimeout(() => setIsPriorityChanging(false), 500)
+        }, 0)
+        return () => {
+            window.clearTimeout(animationStartTimer)
+            if (animationTimer !== undefined) window.clearTimeout(animationTimer)
+        }
+    }, [pageSignature])
 
     return (
         <Swiper
@@ -54,6 +72,7 @@ export default function SwipeNavigator({ pages, currentIndex, onPageChange }: Sw
                     <div
                         className={[
                         "h-full w-full bg-background transition-all duration-300",
+                        isPriorityChanging && "animate-page-priority-change",
                         isActive ? "p-0" : "p-3"
                         ].join(" ")}
                     >
