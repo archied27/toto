@@ -1,9 +1,9 @@
-import { useTaskState, useStartWork, useStopWork, useResetWork, type Task } from "./useTasks";
+import { useTaskState, useStartWork, useStopWork, usePauseWork, type Task } from "./useTasks";
 import TaskCard from "./components/TaskCard";
 import { useNavigation } from "@/hooks/NavigationContext";
 import { WidgetContainer } from "@/components/WidgetContainer";
 import { Button } from "@/components/ui/button";
-import { CircleAlertIcon, ClockIcon, PauseIcon, PlayIcon, SquareIcon, TimerIcon } from "lucide-react";
+import { CircleAlertIcon, ClockIcon, PauseIcon, PlayIcon, SquareIcon, TimerIcon, SkipForwardIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 const maxTasksToShow = 2;
@@ -32,25 +32,26 @@ function useLiveWorkSeconds(task: Task | null): number {
     const sessionSeconds = task.is_working && task.work_session_start
         ? Math.max(0, Math.floor((now - new Date(task.work_session_start).getTime()) / 1000))
         : 0;
-    return (task.time_spent ?? 0) + sessionSeconds;
+    return (task.session_elapsed ?? 0) + sessionSeconds;
 }
 
 const SHORT_BREAK_SECONDS = 5 * 60;
 const LONG_BREAK_SECONDS = 15 * 60;
 
-export function PomodoroTimer({ tasks, initialTaskId, onStop }: { tasks: Task[]; initialTaskId: number; onStop: () => void }) {
+export function PomodoroTimer({ tasks, initialTaskId, onStop, fillHeight = false }: { tasks: Task[]; initialTaskId: number; onStop: () => void; fillHeight: Boolean }) {
     const { startWork, loading: starting } = useStartWork();
     const { stopWork, loading: stopping } = useStopWork();
-    const { resetWork, loading: resetting } = useResetWork();
-    const activeTask = tasks.find((task) => task.is_working) ?? null;
+    const { pauseWork, loading: pausing } = usePauseWork();
+    const activeTask = tasks.find((task) => task.is_working || task.is_paused) ?? null;
     const [selectedTaskId, setSelectedTaskId] = useState<number | null>(initialTaskId);
     const [phase, setPhase] = useState<"focus" | "break">("focus");
     const [breakEndsAt, setBreakEndsAt] = useState<number | null>(null);
     const [breakRemaining, setBreakRemaining] = useState(SHORT_BREAK_SECONDS);
     const [completedFocusSessions, setCompletedFocusSessions] = useState(0);
     const [now, setNow] = useState(() => Date.now());
+    const [animateStop, setAnimateStop] = useState(false);
     const transitionInProgress = useRef(false);
-    const timerBusy = starting || stopping || resetting;
+    const timerBusy = starting || stopping || pausing;
 
     useEffect(() => {
         if (activeTask && activeTask.id !== selectedTaskId) {
@@ -82,7 +83,7 @@ export function PomodoroTimer({ tasks, initialTaskId, onStop }: { tasks: Task[];
     useEffect(() => {
         if (phase !== "focus" || !selectedTask?.is_working || elapsedSeconds < goalSeconds || transitionInProgress.current) return;
         transitionInProgress.current = true;
-        void stopWork(selectedTask.id).then(() => {
+        void pauseWork(selectedTask.id).then(() => {
             const nextSessions = completedFocusSessions + 1;
             const nextBreak = nextSessions % 4 === 0 ? LONG_BREAK_SECONDS : SHORT_BREAK_SECONDS;
             setCompletedFocusSessions(nextSessions);
@@ -92,7 +93,7 @@ export function PomodoroTimer({ tasks, initialTaskId, onStop }: { tasks: Task[];
         }).finally(() => {
             transitionInProgress.current = false;
         });
-    }, [completedFocusSessions, elapsedSeconds, goalSeconds, phase, selectedTask, stopWork]);
+    }, [completedFocusSessions, elapsedSeconds, goalSeconds, pauseWork, phase, selectedTask]);
 
     useEffect(() => {
         if (phase !== "break" || !breakEndsAt || now < breakEndsAt) return;
@@ -125,25 +126,71 @@ export function PomodoroTimer({ tasks, initialTaskId, onStop }: { tasks: Task[];
             return;
         }
         if (selectedTask.is_working) {
-            await stopWork(selectedTask.id);
+            await pauseWork(selectedTask.id);
         } else {
             await startWork(selectedTask.id);
+        }
+    };
+
+    const skipBreak = async (event: React.MouseEvent<HTMLButtonElement>) => {
+        event.stopPropagation();
+        if (timerBusy) return;
+        if (phase === "break") {
+            // End break early and start next focus session
+            if (selectedTask) {
+                const nextSessions = completedFocusSessions + 1;
+                const nextBreak = nextSessions % 4 === 0 ? LONG_BREAK_SECONDS : SHORT_BREAK_SECONDS;
+                setCompletedFocusSessions(nextSessions);
+                setBreakRemaining(nextBreak);
+                setBreakEndsAt(Date.now() + nextBreak * 1000);
+                setPhase("break");
+
+                // Automatically start the next focus session after a brief pause
+                setTimeout(async () => {
+                    if (selectedTask) {
+                        await startWork(selectedTask.id);
+                        setPhase("focus");
+                        setBreakEndsAt(null);
+                    }
+                }, 500);
+            }
+        }
+    };
+
+    const skipToBreak = async (event: React.MouseEvent<HTMLButtonElement>) => {
+        event.stopPropagation();
+        if (timerBusy) return;
+        if (phase === "focus" && selectedTask?.is_working) {
+            // Skip to break: stop current focus and start break immediately
+            await pauseWork(selectedTask.id);
+            const nextSessions = completedFocusSessions + 1;
+            const nextBreak = nextSessions % 4 === 0 ? LONG_BREAK_SECONDS : SHORT_BREAK_SECONDS;
+            setCompletedFocusSessions(nextSessions);
+            setBreakRemaining(nextBreak);
+            setBreakEndsAt(Date.now() + nextBreak * 1000);
+            setPhase("break");
         }
     };
 
     const stopTimer = async (event: React.MouseEvent<HTMLButtonElement>) => {
         event.stopPropagation();
         if (timerBusy) return;
-        await resetWork(selectedTask.id);
+        await stopWork(selectedTask.id);
         onStop();
-        setSelectedTaskId(null);
-        setPhase("focus");
-        setBreakEndsAt(null);
-        setCompletedFocusSessions(0);
+        setAnimateStop(true);
+        // Wait for animation to end before resetting state
+        setTimeout(() => {
+            setSelectedTaskId(null);
+            setPhase("focus");
+            setBreakEndsAt(null);
+            setCompletedFocusSessions(0);
+            setAnimateStop(false);
+        }, 500);
     };
 
     return (
-        <div className="flex h-full min-h-40 flex-col animate-pomodoro-enter">
+        <div className={`flex flex-col gap-3 animate-pomodoro-enter ${fillHeight ? "h-full min-h-0" : ""} ${animateStop ? "animate-pomodoro-stop" : ""}`}>
+            {/* Header: title on the left, controls on the right */}
             <div className="flex items-center gap-3">
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-xl transition-colors duration-300" style={{ backgroundColor: `${accentColour}18`, color: accentColour }}>
                     <TimerIcon key={`${phase}-${isRunning}`} className={`size-4 animate-pomodoro-icon ${isRunning ? "animate-pulse" : ""}`} />
@@ -154,27 +201,48 @@ export function PomodoroTimer({ tasks, initialTaskId, onStop }: { tasks: Task[];
                     </div>
                     <p className="mt-0.5 truncate text-sm font-semibold text-foreground">{selectedTask.title}</p>
                 </div>
-                <Button size="icon" variant="outline" className="size-10 shrink-0 rounded-xl transition-transform duration-200 active:scale-90" onClick={togglePause} disabled={timerBusy} aria-label={isRunning ? "Pause timer" : "Resume timer"} title={isRunning ? "Pause timer" : "Resume timer"}>
-                    <span key={`${phase}-${isRunning}`} className="animate-pomodoro-icon">
-                        {isRunning ? <PauseIcon className="size-4" /> : <PlayIcon className="size-4" />}
-                    </span>
-                </Button>
-                <Button size="icon" variant="destructive" className="size-10 shrink-0 rounded-xl transition-transform duration-200 active:scale-90" onClick={stopTimer} disabled={timerBusy} aria-label="Stop and reset timer" title="Stop and reset timer">
-                    <SquareIcon className="size-4 transition-transform duration-200" />
-                </Button>
+
+                <div className="flex shrink-0 items-center gap-1.5">
+                    <Button size="icon" variant="outline" className="size-8 shrink-0 rounded-lg transition-transform duration-200 active:scale-90" onClick={togglePause} disabled={timerBusy} aria-label={isRunning ? "Pause timer" : "Resume timer"} title={isRunning ? "Pause timer" : "Resume timer"}>
+                        <span key={`${phase}-${isRunning}`} className="animate-pomodoro-icon">
+                            {isRunning ? <PauseIcon className="size-4" /> : <PlayIcon className="size-4" />}
+                        </span>
+                    </Button>
+                    {phase === "focus" && (
+                        <Button size="icon" variant="secondary" className="size-8 shrink-0 rounded-lg transition-transform duration-200 active:scale-90" onClick={skipToBreak} disabled={timerBusy || !selectedTask?.is_working} aria-label="Skip to break" title="Skip to break">
+                            <SkipForwardIcon className="size-4" />
+                        </Button>
+                    )}
+                    {phase === "break" && (
+                        <Button size="icon" variant="secondary" className="size-8 shrink-0 rounded-lg transition-transform duration-200 active:scale-90" onClick={skipBreak} disabled={timerBusy} aria-label="Skip break" title="Skip break">
+                            <SkipForwardIcon className="size-4" />
+                        </Button>
+                    )}
+                    <Button size="icon" variant="destructive" className="size-8 shrink-0 rounded-lg transition-transform duration-200 active:scale-90" onClick={stopTimer} disabled={timerBusy} aria-label="Stop timer" title="Stop timer">
+                        <SquareIcon className="size-4 transition-transform duration-200" />
+                    </Button>
+                </div>
             </div>
+
+            {/* Ring: sized by width, so it works in auto-height containers */}
             <div className="flex flex-1 items-center justify-center">
-                <div className="relative flex size-56 items-center justify-center">
+                <div className={`relative flex aspect-square items-center justify-center ${
+                    fillHeight ? "h-full max-h-full max-w-full" : "w-full max-w-72"
+                }`}>
                     <svg className="absolute inset-0 size-full -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
-                        <circle cx="50" cy="50" r="42" fill="none" stroke={accentColour} strokeOpacity="0.15" strokeWidth="6" />
-                        <circle cx="50" cy="50" r="42" fill="none" stroke={accentColour} strokeWidth="6" strokeLinecap="round" pathLength="100" className="transition-[stroke-dashoffset] duration-700 ease-linear" style={{ strokeDasharray: "100", strokeDashoffset: `${100 - progress}` }} />
+                        <circle cx="50" cy="50" r="46" fill="none" stroke={accentColour} strokeOpacity="0.15" strokeWidth="5" />
+                        <circle cx="50" cy="50" r="46" fill="none" stroke={accentColour} strokeWidth="5" strokeLinecap="round" pathLength="100" className="transition-[stroke-dashoffset] duration-700 ease-linear" style={{ strokeDasharray: "100", strokeDashoffset: `${100 - progress}` }} />
                     </svg>
                     <div className="relative flex flex-col items-center">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: accentColour }}>
+                        <span className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: accentColour }}>
                             {phase === "focus" ? "Focus" : `${completedFocusSessions % 4 === 0 ? "Long" : "Short"} break`}
                         </span>
-                        <span key={`${phase}-${Math.floor((phase === "focus" ? elapsedSeconds : remainingSeconds) / 60)}`} className="mt-1 text-4xl font-semibold tabular-nums tracking-tight text-foreground animate-pomodoro-time">{formatTimer(phase === "focus" ? elapsedSeconds : remainingSeconds)}</span>
-                        <span className="mt-1 text-sm font-medium tabular-nums text-muted-foreground">/ {formatTimer(phase === "focus" ? goalSeconds : breakSeconds)}</span>
+                        <span key={`${phase}-${Math.floor((phase === "focus" ? elapsedSeconds : remainingSeconds) / 60)}`} className="mt-2 text-5xl font-semibold tabular-nums tracking-tight text-foreground animate-pomodoro-time">
+                            {formatTimer(phase === "focus" ? elapsedSeconds : remainingSeconds)}
+                        </span>
+                        <span className="mt-2 text-base font-medium tabular-nums text-muted-foreground">
+                            / {formatTimer(phase === "focus" ? goalSeconds : breakSeconds)}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -191,7 +259,7 @@ export function TasksHero() {
     const todayTasks = taskState ? taskState.today_tasks.filter((t) => !t.completed) : [];
     const availableTasks = [...(taskState?.active_tasks ?? []), ...overdueTasks, ...dueTodayTasks, ...todayTasks]
         .filter((task, index, tasks) => tasks.findIndex(candidate => candidate.id === task.id) === index);
-    const activeTask = availableTasks.find(task => task.is_working) ?? null;
+    const activeTask = availableTasks.find(task => task.is_working || task.is_paused) ?? null;
     const [pomodoroTaskId, setPomodoroTaskId] = useState<number | null>(activeTask?.id ?? null);
     useEffect(() => {
         if (!activeTask) return;
@@ -223,7 +291,7 @@ export function TasksHero() {
     return (
         <WidgetContainer onClick={() => navigate("tasks")}>
             {pomodoroTask ? (
-                <PomodoroTimer tasks={availableTasks} initialTaskId={pomodoroTask.id} onStop={() => setPomodoroTaskId(null)} />
+                <PomodoroTimer tasks={availableTasks} initialTaskId={pomodoroTask.id} onStop={() => setPomodoroTaskId(null)} fillHeight />
             ) : (
                 <>
             { /* Overdue Tasks */ }

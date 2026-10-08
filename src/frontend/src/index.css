@@ -278,6 +278,15 @@
   animation: pomodoro-time 0.25s ease-out both;
 }
 
+@keyframes pomodoro-stop {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.95); }
+}
+
+.animate-pomodoro-stop {
+  animation: pomodoro-stop 0.5s ease-out forwards;
+}
+
 /* Markdown code fence syntax highlighting (rehype-highlight token classes).
    Tuned for the dark CodeBlock background in MarkdownRenderer. */
 .hljs-comment,

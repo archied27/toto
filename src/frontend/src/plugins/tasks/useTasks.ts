@@ -25,9 +25,19 @@ export interface Task {
     labels?: Label[];
     task_list?: TaskList;
     is_working?: boolean;
+    is_paused?: boolean;
+    session_elapsed?: number;
     time_spent?: number;
     work_session_start?: string;
     pomodoro_goal?: number;
+}
+
+export interface WorkSession {
+    id: number;
+    task_id: number;
+    started_at: string;
+    ended_at: string;
+    duration_seconds: number;
 }
 
 export interface TaskState {
@@ -323,9 +333,23 @@ export function useToggleTaskCompletion() {
         } finally {
             setLoading(false);
         }
+
     }, []);
 
     return { toggleCompletion, loading };
+}
+
+export function useTaskSessions(taskId: number, enabled: boolean) {
+    const [sessions, setSessions] = useState<WorkSession[]>([]);
+
+    useEffect(() => {
+        if (!enabled) return;
+        apiFetch<WorkSession[]>(`/tasks/get_task_sessions/${taskId}`)
+            .then(setSessions)
+            .catch(() => console.error("Failed to fetch task work sessions"));
+    }, [enabled, taskId]);
+
+    return sessions;
 }
 
 export function useDeleteTask() {
@@ -350,10 +374,11 @@ export function useDeleteTask() {
 export function useStartWork() {
     const [loading, setLoading] = useState(false);
 
-    const startWork = useCallback(async (taskId: number) => {
+    const startWork = useCallback(async (taskId: number, resetSession = false) => {
         setLoading(true);
         try {
-            await apiFetch(`/tasks/start_work/${taskId}`, {
+            const query = resetSession ? "?reset_session=true" : "";
+            await apiFetch(`/tasks/start_work/${taskId}${query}`, {
                 method: "PUT",
             });
         } catch (error) {
@@ -402,6 +427,25 @@ export function useResetWork() {
     }, []);
 
     return { resetWork, loading };
+}
+
+export function usePauseWork() {
+    const [loading, setLoading] = useState(false);
+
+    const pauseWork = useCallback(async (taskId: number) => {
+        setLoading(true);
+        try {
+            await apiFetch(`/tasks/pause_work/${taskId}`, {
+                method: "PUT",
+            });
+        } catch (error) {
+            console.error("Failed to pause work", error);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    return { pauseWork, loading };
 }
 
 export function useSetPomodoroGoal() {

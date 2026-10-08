@@ -39,11 +39,20 @@ class Task(BaseModel):
     labels: list[Label] = Field(default_factory=list)
     task_list: Optional[TaskList] = None
     is_working: bool = False
+    is_paused: bool = False
+    session_elapsed: int = 0
     time_spent: int = 0
     work_session_start: Optional[str] = None
     pomodoro_goal: int = 1500  # default 25 minutes in seconds
 
 TaskList.model_rebuild()
+
+class WorkSession(BaseModel):
+    id: int
+    task_id: int
+    started_at: str
+    ended_at: str
+    duration_seconds: int
 
 class TasksState(BaseModel):
     dashboard_priority: int = 0

@@ -6,7 +6,7 @@ from typing import Optional
 
 from app.plugins.tasks.controller.db_controller import TasksDBController
 from app.core.core import Core
-from app.plugins.tasks.schemas import Task, TaskList, Label, TasksState, CreateLabel, CreateTaskList, CreateTask
+from app.plugins.tasks.schemas import Task, TaskList, Label, TasksState, WorkSession, CreateLabel, CreateTaskList, CreateTask
 from dataclasses import asdict
 
 class TasksController:
@@ -37,7 +37,7 @@ class TasksController:
             overdue_tasks=overdue_tasks,
             today_tasks=todays_tasks,
             tasks_due_today=tasks_due_today,
-            active_tasks=[task for task in all_tasks if task.is_working],
+            active_tasks=[task for task in all_tasks if task.is_working or task.is_paused],
         )
 
         old_state = self.core.state.get("tasks")
@@ -60,7 +60,7 @@ class TasksController:
     async def get_current_priority(self) -> int:
         # Check if any task is currently being worked on (timer active)
         all_tasks = await self.db_controller.get_all_tasks()
-        if any(task.is_working for task in all_tasks):
+        if any(task.is_working or task.is_paused for task in all_tasks):
             return 95
 
         overdue_tasks = await self.db_controller.get_overdue_tasks()
@@ -180,14 +180,19 @@ class TasksController:
     async def get_tasks_completed_on(self, iso_date: str) -> list[Task]:
         return await self.db_controller.get_tasks_completed_on(iso_date)
 
-    async def start_work(self, task_id: str):
+    async def start_work(self, task_id: str, reset_session: bool = False):
         # start working on a task
-        await self.db_controller.start_work(int(task_id))
+        await self.db_controller.start_work(int(task_id), reset_session)
         await self.update_state()
 
     async def stop_work(self, task_id: str):
         # stop working on a task
         await self.db_controller.stop_work(int(task_id))
+        await self.update_state()
+
+    async def pause_work(self, task_id: str):
+        # pause working on a task (preserves current session progress)
+        await self.db_controller.pause_work(int(task_id))
         await self.update_state()
 
     async def reset_work(self, task_id: str):
@@ -198,6 +203,9 @@ class TasksController:
         # set pomodoro goal for a task
         await self.db_controller.set_pomodoro_goal(int(task_id), goal_seconds)
         await self.update_state()
+
+    async def get_task_sessions(self, task_id: str) -> list[WorkSession]:
+        return await self.db_controller.get_task_sessions(int(task_id))
 
     async def get_list_by_name(self, name: str) -> Optional[TaskList]:
         return await self.db_controller.get_list_by_name(name)

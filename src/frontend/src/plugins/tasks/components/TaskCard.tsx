@@ -1,9 +1,9 @@
 import { Card } from "@/components/ui/card";
-import { useDeleteTask, useToggleTaskCompletion, useStartWork, useStopWork, useResetWork, type SweepDirection, type Task } from "../useTasks";
+import { useDeleteTask, useToggleTaskCompletion, useStartWork, useTaskSessions, usePauseWork, useStopWork, type SweepDirection, type Task } from "../useTasks";
 import { format, isToday, isTomorrow, isYesterday ,isThisWeek, parseISO, startOfWeek, endOfWeek, addWeeks } from "date-fns";
 import { getTextColour } from "../utils";
 import { Button } from "@/components/ui/button";
-import { CircleCheckIcon, CircleIcon, EditIcon, TrashIcon, PlayIcon, PauseIcon, SquareIcon, TimerIcon } from "lucide-react";
+import { CircleCheckIcon, CircleIcon, EditIcon, TrashIcon, PlayIcon, TimerIcon, HistoryIcon, PauseIcon, SquareIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import EditTask from "./EditTask";
 import { useEffect, useState } from "react";
@@ -49,11 +49,13 @@ export default function TaskCard({ task, refresh, className, onSweepingChange }:
     const { toggleCompletion } = useToggleTaskCompletion();
     const { deleteTask } = useDeleteTask();
     const { startWork } = useStartWork();
+    const { pauseWork } = usePauseWork();
     const { stopWork } = useStopWork();
-    const { resetWork } = useResetWork();
 
     const [editOpen, setEditOpen] = useState(false);
     const [sweeping, setSweeping] = useState<SweepDirection | null>(null);
+    const [detailsOpen, setDetailsOpen] = useState(false);
+    const sessions = useTaskSessions(task.id, detailsOpen);
     const [now, setNow] = useState(() => Date.now());
 
     useEffect(() => {
@@ -62,10 +64,10 @@ export default function TaskCard({ task, refresh, className, onSweepingChange }:
         return () => window.clearInterval(interval);
     }, [task.is_working]);
 
+    // Calculate session seconds from the active portion or the paused session total.
     const sessionSeconds = task.is_working && task.work_session_start
         ? Math.max(0, Math.floor((now - new Date(task.work_session_start).getTime()) / 1000))
-        : 0;
-    const totalSeconds = (task.time_spent ?? 0) + sessionSeconds;
+        : task.is_paused ? (task.session_elapsed ?? 0) : 0;
 
     const handleToggle = async (e: React.MouseEvent<HTMLButtonElement>) => {
         e.stopPropagation();
@@ -90,26 +92,26 @@ export default function TaskCard({ task, refresh, className, onSweepingChange }:
         refresh();
     };
 
-    const handleStopWork = async (e: React.MouseEvent<HTMLButtonElement>) => {
-        e.stopPropagation();
-        await stopWork(task.id);
-        refresh();
-    };
-
-    const handleResetWork = async (e: React.MouseEvent<HTMLButtonElement>) => {
-        e.stopPropagation();
-        await resetWork(task.id);
-        refresh();
-    };
-
     const handleDelete = async (e: React.MouseEvent<HTMLButtonElement>) => {
         e.stopPropagation();
         await deleteTask(task.id);
         refresh();
     }
 
+    const handlePauseWork = async (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
+        await pauseWork(task.id);
+        refresh();
+    };
+
+    const handleStopWork = async (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
+        await stopWork(task.id);
+        refresh();
+    };
+
     return (
-        <Dialog>
+        <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
             <DialogTrigger asChild>
                 <Card className={`relative overflow-hidden p-2 flex flex-row gap-2 border border-border/50 hover:border-border/80 transition-colors ${className || ""}`} onClick={(e) => e.stopPropagation()}>
                     {sweeping && (
@@ -129,11 +131,7 @@ export default function TaskCard({ task, refresh, className, onSweepingChange }:
                                 <CircleIcon className="w-4 h-4 text-foreground" />
                             )}
                         </Button>
-                        {task.is_working ? (
-                            <Button onClick={handleStopWork} aria-label="Pause work timer" title="Pause work timer" size={"icon"} className="self-center bg-muted h-8 w-8 border-2 border-border">
-                                <PauseIcon className="w-4 h-4 text-yellow-400" />
-                            </Button>
-                        ) : (
+                        {!task.is_working && !task.is_paused && (
                             <Button onClick={handleStartWork} size={"icon"} className="self-center bg-muted h-8 w-8 border-2 border-border">
                                 <PlayIcon className="w-4 h-4 text-blue-400" />
                             </Button>
@@ -199,32 +197,77 @@ export default function TaskCard({ task, refresh, className, onSweepingChange }:
                     ))}
                 </div>
 
-                <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-semibold">Focus timer</p>
-                            <p className="text-xs text-muted-foreground">
-                                {task.is_working ? `${formatDuration(totalSeconds)} in the current session` : `${formatDuration(task.time_spent ?? 0)} completed`}
-                            </p>
+                <div className="rounded-xl border border-border/60 bg-muted/30 p-6 relative flex flex-col items-center">
+                    <div className="relative mb-6">
+                        <div className="flex items-center justify-center">
+                            <div className="relative w-40 h-40">
+                                <div className="absolute inset-0">
+                                    <div className="w-full h-full rounded-full border-4 border-border/30 flex items-center justify-center bg-background/20">
+                                        <p className="text-4xl font-mono text-foreground">
+                                            {task.is_working ? `${formatDuration(sessionSeconds)}` : `${formatDuration(task.time_spent ?? 0)}`}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                        <Button variant={task.is_working ? "outline" : "default"} size="sm" onClick={task.is_working ? handleStopWork : handleStartWork}>
-                            {task.is_working ? <PauseIcon className="mr-1.5 h-4 w-4" /> : <PlayIcon className="mr-1.5 h-4 w-4" />}
-                            {task.is_working ? "Pause" : "Start"}
-                        </Button>
-                        {(task.is_working || (task.time_spent ?? 0) > 0) && (
-                            <Button variant="destructive" size="sm" onClick={handleResetWork}>
-                                <SquareIcon className="mr-1.5 h-4 w-4" />
-                                Stop
-                            </Button>
-                        )}
+                        <div className="absolute -top-4 -right-12">
+                            <div className="flex flex-col gap-2 items-end">
+                                {!task.is_working && !task.is_paused && (
+                                    <Button variant="default" size="sm" onClick={handleStartWork}>
+                                        <PlayIcon className="mr-1 h-3 w-3" />
+                                        Start
+                                    </Button>
+                                )}
+                                {task.is_working && (
+                                    <Button variant="default" size="sm" onClick={handlePauseWork}>
+                                        <PauseIcon className="mr-1 h-3 w-3" />
+                                        Pause
+                                    </Button>
+                                )}
+                                {task.is_paused && (
+                                    <Button variant="default" size="sm" onClick={handleStartWork}>
+                                        <PlayIcon className="mr-1 h-3 w-3" />
+                                        Resume
+                                    </Button>
+                                )}
+                                {(task.is_working || task.is_paused) && (
+                                    <Button variant="destructive" size="sm" onClick={handleStopWork}>
+                                        <SquareIcon className="mr-1 h-3 w-3" />
+                                        Stop
+                                    </Button>
+                                )}
+                            </div>
                         </div>
                     </div>
-                    <div className="mt-3 flex items-center gap-2 rounded-lg border border-border/50 bg-background/40 px-3 py-2">
-                        <TimerIcon className={`h-4 w-4 ${task.is_working ? "animate-pulse text-blue-400" : "text-muted-foreground"}`} />
-                        <div>
-                            <p className="text-xs font-medium text-foreground">Focus completed</p>
-                            <p className="text-xs text-muted-foreground">{formatDuration(task.time_spent ?? 0)} of focused work already done</p>
+                    <div className="w-full space-y-3">
+                        <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-background/40 px-3 py-2">
+                            <TimerIcon className={`h-4 w-4 ${(task.is_working || task.is_paused) ? "animate-pulse text-blue-400" : "text-muted-foreground"}`} />
+                            <div className="flex flex-col">
+                                <p className="text-xs font-medium text-foreground">Focus completed</p>
+                                <p className="text-xs text-muted-foreground">{formatDuration(task.time_spent ?? 0)} of focused work already done</p>
+                            </div>
+                        </div>
+                        <div className="rounded-lg border border-border/50 bg-background/40 px-3 py-2">
+                            <div className="flex items-center gap-2">
+                                <HistoryIcon className="h-4 w-4 text-muted-foreground" />
+                                <p className="text-xs font-medium text-foreground">Focus sessions</p>
+                            </div>
+                            {sessions.length === 0 ? (
+                                <p className="mt-2 text-xs text-muted-foreground">No completed focus sessions yet.</p>
+                            ) : (
+                                <div className="mt-2 max-h-32 space-y-1 overflow-y-auto">
+                                    {sessions.map((session) => (
+                                        <div key={session.id} className="flex items-center justify-between gap-3 text-xs">
+                                            <span className="text-muted-foreground">
+                                                {format(parseISO(session.started_at), "d MMM, HH:mm")}
+                                            </span>
+                                            <span className="font-medium tabular-nums text-foreground">
+                                                {formatDuration(session.duration_seconds)}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

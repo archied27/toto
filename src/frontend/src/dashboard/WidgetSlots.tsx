@@ -16,11 +16,11 @@ export default function WidgetSlots({ widgets }: WidgetSlotsProps) {
 
   return (
     <div className="flex flex-col p-4 gap-4 h-full">
-      <div className="h-[55%]">
+      <div className="h-[50%]">
         {hero && hero.component}
       </div>
 
-      <div className="h-[10%]">
+      <div className="h-[15%]">
         {wide && wide.component}
       </div>
 

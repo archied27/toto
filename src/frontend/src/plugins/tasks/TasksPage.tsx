@@ -125,7 +125,7 @@ export default function TasksPage() {
     ].filter((task, index, tasks) =>
         tasks.findIndex(candidate => candidate.id === task.id) === index
     );
-    const focusedTask = focusTasks.find(task => task.is_working) ?? null;
+    const focusedTask = focusTasks.find(task => task.is_working || task.is_paused) ?? null;
 
     const completedTasks = dedupedTasks.filter(task =>
         sweeps[task.id]?.direction === "incomplete"
@@ -223,6 +223,7 @@ export default function TasksPage() {
                                     tasks={focusTasks}
                                     initialTaskId={focusedTask.id}
                                     onStop={() => getTasks()}
+                                    fillHeight={false}
                                 />
                             </div>
                         </section>

@@ -5,7 +5,7 @@ handles all interaction with the database for the tasks plugin
 from typing import Optional
 
 from app.core.core import Core
-from app.plugins.tasks.schemas import Task, TaskList, Label, TasksState, CreateLabel, CreateTaskList, CreateTask
+from app.plugins.tasks.schemas import Task, TaskList, Label, TasksState, WorkSession, CreateLabel, CreateTaskList, CreateTask
 
 
 class TasksDBController:
@@ -38,8 +38,11 @@ class TasksDBController:
                 date_completed TEXT,
                 list_id INTEGER,
                 is_working BOOLEAN DEFAULT 0,
+                is_paused BOOLEAN DEFAULT 0,
+                session_elapsed INTEGER DEFAULT 0,
                 time_spent INTEGER DEFAULT 0,
                 work_session_start TEXT,
+                session_started_at TEXT,
                 pomodoro_goal INTEGER DEFAULT 1500
             );
 
@@ -47,6 +50,14 @@ class TasksDBController:
                 task_id INTEGER,
                 label_id INTEGER,
                 PRIMARY KEY (task_id, label_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS tasks_work_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id INTEGER NOT NULL,
+                started_at TEXT NOT NULL,
+                ended_at TEXT NOT NULL,
+                duration_seconds INTEGER NOT NULL
             );
             """
         )
@@ -58,8 +69,11 @@ class TasksDBController:
         }
         columns = {
             "is_working": "BOOLEAN DEFAULT 0",
+            "is_paused": "BOOLEAN DEFAULT 0",
+            "session_elapsed": "INTEGER DEFAULT 0",
             "time_spent": "INTEGER DEFAULT 0",
             "work_session_start": "TEXT",
+            "session_started_at": "TEXT",
             "pomodoro_goal": "INTEGER DEFAULT 1500",
         }
         for name, definition in columns.items():
@@ -174,6 +188,8 @@ class TasksDBController:
             labels=labels,
             task_list=task_list,
             is_working=bool(row["is_working"]),
+            is_paused=bool(row["is_paused"]),
+            session_elapsed=row["session_elapsed"],
             time_spent=row["time_spent"],
             work_session_start=row["work_session_start"],
             pomodoro_goal=row["pomodoro_goal"]
@@ -273,40 +289,87 @@ class TasksDBController:
     # Work Session
     # -------------------------------------------------------------------------
 
-    async def start_work(self, task_id: int):
+    async def _record_work_session(self, task_id: int, started_at: str | None, duration_seconds: int, ended_at: str):
+        if duration_seconds <= 0:
+            return
+        from datetime import datetime, timedelta, timezone
+        end = datetime.fromisoformat(ended_at)
+        start = datetime.fromisoformat(started_at) if started_at else end - timedelta(seconds=duration_seconds)
+        await self.core.db_manager.execute(
+            """
+            INSERT INTO tasks_work_sessions (task_id, started_at, ended_at, duration_seconds)
+            VALUES (?, ?, ?, ?)
+            """,
+            (task_id, start.isoformat(), end.isoformat(), duration_seconds),
+        )
+
+    async def get_task_sessions(self, task_id: int) -> list[WorkSession]:
+        rows = await self.core.db_manager.fetch_all(
+            """
+            SELECT id, task_id, started_at, ended_at, duration_seconds
+            FROM tasks_work_sessions
+            WHERE task_id = ?
+            ORDER BY started_at DESC
+            """,
+            (task_id,),
+        )
+        return [WorkSession(**dict(row)) for row in rows]
+
+    async def start_work(self, task_id: int, reset_session: bool = False):
         from datetime import datetime, timezone
         start_time = datetime.now(timezone.utc).isoformat()
         await self.core.db_manager.execute(
-            "UPDATE tasks_tasks SET is_working = 1, work_session_start = ? WHERE id = ?",
-            (start_time, task_id)
+            """
+            UPDATE tasks_tasks
+            SET is_working = 1,
+                is_paused = 0,
+                session_elapsed = CASE WHEN ? THEN 0 ELSE session_elapsed END,
+                work_session_start = ?,
+                session_started_at = CASE
+                    WHEN ? OR session_started_at IS NULL THEN ?
+                    ELSE session_started_at
+                END
+            WHERE id = ? AND (is_paused = 1 OR is_working = 0 OR ? = 1)
+            """,
+            (
+                int(reset_session),
+                start_time,
+                int(reset_session),
+                start_time,
+                task_id,
+                int(reset_session),
+            ),
         )
 
     async def stop_work(self, task_id: int):
         from datetime import datetime, timezone
-        # First, get the current work_session_start and the current time_spent
+        # First, get the current work_session_start, time_spent, and session_elapsed
         row = await self.core.db_manager.fetch_one(
-            "SELECT work_session_start, time_spent FROM tasks_tasks WHERE id = ?",
+            "SELECT work_session_start, session_started_at, time_spent, session_elapsed FROM tasks_tasks WHERE id = ?",
             (task_id,)
         )
-        if not row or not row["work_session_start"]:
-            # If there's no work session started, we just set is_working to 0 and leave time_spent as is?
-            await self.core.db_manager.execute(
-                "UPDATE tasks_tasks SET is_working = 0, work_session_start = NULL WHERE id = ?",
-                (task_id,)
-            )
+        if not row:
             return
 
-        start_time = datetime.fromisoformat(row["work_session_start"])
         now = datetime.now(timezone.utc)
-        elapsed_seconds = int((now - start_time).total_seconds())
+        elapsed_seconds = 0
+        if row["work_session_start"]:
+            start_time = datetime.fromisoformat(row["work_session_start"])
+            elapsed_seconds = int((now - start_time).total_seconds())
 
-        new_time_spent = row["time_spent"] + elapsed_seconds
+        session_duration = row["session_elapsed"] + elapsed_seconds
+        session_started_at = row["session_started_at"] or row["work_session_start"]
+        await self._record_work_session(task_id, session_started_at, session_duration, now.isoformat())
 
+        new_time_spent = row["time_spent"] + session_duration
         await self.core.db_manager.execute(
             """
             UPDATE tasks_tasks
             SET is_working = 0,
+                is_paused = 0,
+                session_elapsed = 0,
                 work_session_start = NULL,
+                session_started_at = NULL,
                 time_spent = ?
             WHERE id = ?
             """,
@@ -318,17 +381,46 @@ class TasksDBController:
             """
             UPDATE tasks_tasks
             SET is_working = 0,
+                is_paused = 0,
+                session_elapsed = 0,
                 work_session_start = NULL,
+                session_started_at = NULL,
                 time_spent = 0
             WHERE id = ?
             """,
             (task_id,)
         )
-
-    async def set_pomodoro_goal(self, task_id: int, goal_seconds: int):
         await self.core.db_manager.execute(
-            "UPDATE tasks_tasks SET pomodoro_goal = ? WHERE id = ?",
-            (goal_seconds, task_id)
+            "DELETE FROM tasks_work_sessions WHERE task_id = ?", (task_id,)
+        )
+
+    async def pause_work(self, task_id: int):
+        from datetime import datetime, timezone
+        # First, get the current work_session_start, time_spent, and session_elapsed
+        row = await self.core.db_manager.fetch_one(
+            "SELECT work_session_start, session_elapsed FROM tasks_tasks WHERE id = ?",
+            (task_id,)
+        )
+        if not row or not row["work_session_start"]:
+            # If there's no work session started, just return
+            return
+
+        start_time = datetime.fromisoformat(row["work_session_start"])
+        now = datetime.now(timezone.utc)
+        elapsed_seconds = int((now - start_time).total_seconds())
+
+        # Pausing preserves the current session; stop_work finalizes it.
+        new_session_elapsed = row["session_elapsed"] + elapsed_seconds
+        await self.core.db_manager.execute(
+            """
+            UPDATE tasks_tasks
+            SET is_working = 0,
+                is_paused = 1,
+                session_elapsed = ?,
+                work_session_start = NULL
+            WHERE id = ?
+            """,
+            (new_session_elapsed, task_id)
         )
 
     async def delete_task(self, task_id: int):

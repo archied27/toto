@@ -33,8 +33,10 @@ class TasksRouter:
         self.router.add_api_route("/toggle_task_completion/{task_id}", self.toggle_task_completion, methods=["PUT"])
         self.router.add_api_route("/start_work/{task_id}", self.start_work, methods=["PUT"])
         self.router.add_api_route("/stop_work/{task_id}", self.stop_work, methods=["PUT"])
+        self.router.add_api_route("/pause_work/{task_id}", self.pause_work, methods=["PUT"])
         self.router.add_api_route("/reset_work/{task_id}", self.reset_work, methods=["PUT"])
         self.router.add_api_route("/set_pomodoro_goal/{task_id}", self.set_pomodoro_goal, methods=["PUT"])
+        self.router.add_api_route("/get_task_sessions/{task_id}", self.get_task_sessions, methods=["GET"])
         
     async def add_task(self, task: CreateTask):
         await self.controller.add_task(task)
@@ -67,6 +69,10 @@ class TasksRouter:
     async def get_list(self, list_id: str):
         task_list = await self.controller.get_list(list_id)
         return task_list
+
+    async def pause_work(self, task_id: str):
+        await self.controller.pause_work(task_id)
+        return {"message": "Paused work on task successfully"}
 
     async def add_label(self, label: CreateLabel):
         await self.controller.add_label(label)
@@ -116,8 +122,8 @@ class TasksRouter:
         await self.controller.toggle_task_completion(task_id)
         return {"message": "Task completion toggled successfully"}
 
-    async def start_work(self, task_id: str):
-        await self.controller.start_work(task_id)
+    async def start_work(self, task_id: str, reset_session: bool = False):
+        await self.controller.start_work(task_id, reset_session)
         return {"message": "Started working on task successfully"}
 
     async def stop_work(self, task_id: str):
@@ -131,3 +137,6 @@ class TasksRouter:
     async def set_pomodoro_goal(self, task_id: str, goal_seconds: int):
         await self.controller.set_pomodoro_goal(task_id, goal_seconds)
         return {"message": "Pomodoro goal set successfully"}
+
+    async def get_task_sessions(self, task_id: str):
+        return await self.controller.get_task_sessions(task_id)

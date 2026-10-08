@@ -281,6 +281,19 @@ class TasksCommand(BaseCommand):
                 loading_msg="Setting Pomodoro Goal",
             ),
             IntentSpec(
+                name="pause_work",
+                command_name="Pause Working On Task",
+                description="pause working on a specific task",
+                type="write",
+                examples=[
+                    "pause working on essay",
+                    "pause task coding problems",
+                    "pause work on ai coursework",
+                ],
+                slots=AddTaskSlots,  # Reuse task name slot for simplicity
+                loading_msg="Pausing Work",
+            ),
+            IntentSpec(
                 name="show_add_task",
                 command_name="Input A New Task",
                 description="show the add task form to add a new task",
@@ -384,13 +397,27 @@ class TasksCommand(BaseCommand):
             # Find a task that is currently working (is_working == True)
             current_work = None
             for t in tasks:
-                if t.is_working:
+                if t.is_working or t.is_paused:
                     current_work = t
                     break
             if not current_work:
                 return CommandResult(False, "stop_work", "No task is currently being worked on", {})
             await self.controller.stop_work(str(current_work.id))
             return CommandResult(True, "stop_work", f"Stopped working on '{current_work.title}'", {"task_id": current_work.id})
+
+        if intent == "pause_work":
+            # Pause working on the currently working task, or if there is one? We'll pause the task that is currently working.
+            tasks = await self.controller.get_all_tasks()
+            # Find a task that is currently working (is_working == True)
+            current_work = None
+            for t in tasks:
+                if t.is_working or t.is_paused:
+                    current_work = t
+                    break
+            if not current_work:
+                return CommandResult(False, "pause_work", "No task is currently being worked on", {})
+            await self.controller.pause_work(str(current_work.id))
+            return CommandResult(True, "pause_work", f"Paused working on '{current_work.title}'", {"task_id": current_work.id})
 
         if intent == "set_pomodoro_goal":
             # We need to find the task by name and extract the goal from the raw text or slots
