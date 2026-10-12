@@ -38,32 +38,77 @@ function useLiveWorkSeconds(task: Task | null): number {
 const SHORT_BREAK_SECONDS = 5 * 60;
 const LONG_BREAK_SECONDS = 15 * 60;
 
-export function PomodoroTimer({ tasks, initialTaskId, onStop, fillHeight = false }: { tasks: Task[]; initialTaskId: number; onStop: () => void; fillHeight: Boolean }) {
+type PomodoroPhase = "focus" | "break";
+
+interface StoredPomodoroState {
+    taskId: number;
+    phase: PomodoroPhase;
+    breakEndsAt: number | null;
+    breakRemaining: number;
+    completedFocusSessions: number;
+}
+
+const pomodoroStorageKey = (taskId: number) => `toto:pomodoro:${taskId}`;
+
+function readPomodoroState(taskId: number): StoredPomodoroState | null {
+    try {
+        const stored = window.localStorage.getItem(pomodoroStorageKey(taskId));
+        if (!stored) return null;
+        const parsed = JSON.parse(stored) as Partial<StoredPomodoroState>;
+        if (
+            parsed.taskId !== taskId
+            || (parsed.phase !== "focus" && parsed.phase !== "break")
+            || typeof parsed.breakRemaining !== "number"
+            || typeof parsed.completedFocusSessions !== "number"
+            || (parsed.breakEndsAt !== null && typeof parsed.breakEndsAt !== "number")
+        ) {
+            window.localStorage.removeItem(pomodoroStorageKey(taskId));
+            return null;
+        }
+        return {
+            taskId,
+            phase: parsed.phase,
+            breakEndsAt: parsed.breakEndsAt ?? null,
+            breakRemaining: Math.max(0, Math.ceil(parsed.breakRemaining)),
+            completedFocusSessions: Math.max(0, Math.floor(parsed.completedFocusSessions)),
+        };
+    } catch (error) {
+        console.error("Failed to restore Pomodoro timer state", error);
+        window.localStorage.removeItem(pomodoroStorageKey(taskId));
+        return null;
+    }
+}
+
+export function PomodoroTimer({ tasks, initialTaskId, onStop, fillHeight = false }: { tasks: Task[]; initialTaskId: number; onStop: () => void; fillHeight: boolean }) {
     const { startWork, loading: starting } = useStartWork();
     const { stopWork, loading: stopping } = useStopWork();
     const { pauseWork, loading: pausing } = usePauseWork();
     const activeTask = tasks.find((task) => task.is_working || task.is_paused) ?? null;
+    const activeTaskId = activeTask?.id;
     const [selectedTaskId, setSelectedTaskId] = useState<number | null>(initialTaskId);
-    const [phase, setPhase] = useState<"focus" | "break">("focus");
+    const [phase, setPhase] = useState<PomodoroPhase>("focus");
     const [breakEndsAt, setBreakEndsAt] = useState<number | null>(null);
     const [breakRemaining, setBreakRemaining] = useState(SHORT_BREAK_SECONDS);
     const [completedFocusSessions, setCompletedFocusSessions] = useState(0);
     const [now, setNow] = useState(() => Date.now());
     const [animateStop, setAnimateStop] = useState(false);
+    const hydratedTaskId = useRef<number | null>(null);
     const transitionInProgress = useRef(false);
     const timerBusy = starting || stopping || pausing;
 
     useEffect(() => {
-        if (activeTask && activeTask.id !== selectedTaskId) {
-            const syncTimer = window.setTimeout(() => {
-                setSelectedTaskId(activeTask.id);
-                setPhase("focus");
-                setBreakEndsAt(null);
-                setCompletedFocusSessions(0);
-            }, 0);
-            return () => window.clearTimeout(syncTimer);
-        }
-    }, [activeTask, activeTask?.id, selectedTaskId]);
+        if (!activeTaskId || hydratedTaskId.current === activeTaskId) return;
+        hydratedTaskId.current = activeTaskId;
+        const stored = readPomodoroState(activeTaskId);
+        const hydrateTimer = window.setTimeout(() => {
+            setSelectedTaskId(activeTaskId);
+            setPhase(stored?.phase ?? "focus");
+            setBreakEndsAt(stored?.breakEndsAt ?? null);
+            setBreakRemaining(stored?.breakRemaining ?? SHORT_BREAK_SECONDS);
+            setCompletedFocusSessions(stored?.completedFocusSessions ?? 0);
+        }, 0);
+        return () => window.clearTimeout(hydrateTimer);
+    }, [activeTaskId]);
 
     useEffect(() => {
         const interval = window.setInterval(() => setNow(Date.now()), 1000);
@@ -81,6 +126,22 @@ export function PomodoroTimer({ tasks, initialTaskId, onStop, fillHeight = false
         : Math.max(0, goalSeconds - elapsedSeconds);
 
     useEffect(() => {
+        if (!selectedTaskId || hydratedTaskId.current !== selectedTaskId) return;
+        const state: StoredPomodoroState = {
+            taskId: selectedTaskId,
+            phase,
+            breakEndsAt,
+            breakRemaining,
+            completedFocusSessions,
+        };
+        try {
+            window.localStorage.setItem(pomodoroStorageKey(selectedTaskId), JSON.stringify(state));
+        } catch (error) {
+            console.error("Failed to save Pomodoro timer state", error);
+        }
+    }, [breakEndsAt, breakRemaining, completedFocusSessions, phase, selectedTaskId]);
+
+    useEffect(() => {
         if (phase !== "focus" || !selectedTask?.is_working || elapsedSeconds < goalSeconds || transitionInProgress.current) return;
         transitionInProgress.current = true;
         void pauseWork(selectedTask.id).then(() => {
@@ -96,14 +157,13 @@ export function PomodoroTimer({ tasks, initialTaskId, onStop, fillHeight = false
     }, [completedFocusSessions, elapsedSeconds, goalSeconds, pauseWork, phase, selectedTask]);
 
     useEffect(() => {
-        if (phase !== "break" || !breakEndsAt || now < breakEndsAt) return;
-        if (!selectedTask) return;
-        const transitionTimer = window.setTimeout(() => {
+        if (phase !== "break" || !breakEndsAt || now < breakEndsAt || !selectedTask || transitionInProgress.current) return;
+        transitionInProgress.current = true;
+        void startWork(selectedTask.id).finally(() => {
             setBreakEndsAt(null);
             setPhase("focus");
-            void startWork(selectedTask.id);
-        }, 0);
-        return () => window.clearTimeout(transitionTimer);
+            transitionInProgress.current = false;
+        });
     }, [breakEndsAt, now, phase, selectedTask, startWork]);
 
     if (!selectedTask) return null;
@@ -135,26 +195,12 @@ export function PomodoroTimer({ tasks, initialTaskId, onStop, fillHeight = false
     const skipBreak = async (event: React.MouseEvent<HTMLButtonElement>) => {
         event.stopPropagation();
         if (timerBusy) return;
-        if (phase === "break") {
-            // End break early and start next focus session
-            if (selectedTask) {
-                const nextSessions = completedFocusSessions + 1;
-                const nextBreak = nextSessions % 4 === 0 ? LONG_BREAK_SECONDS : SHORT_BREAK_SECONDS;
-                setCompletedFocusSessions(nextSessions);
-                setBreakRemaining(nextBreak);
-                setBreakEndsAt(Date.now() + nextBreak * 1000);
-                setPhase("break");
-
-                // Automatically start the next focus session after a brief pause
-                setTimeout(async () => {
-                    if (selectedTask) {
-                        await startWork(selectedTask.id);
-                        setPhase("focus");
-                        setBreakEndsAt(null);
-                    }
-                }, 500);
-            }
-        }
+        if (phase !== "break") return;
+        transitionInProgress.current = true;
+        await startWork(selectedTask.id);
+        setBreakEndsAt(null);
+        setPhase("focus");
+        transitionInProgress.current = false;
     };
 
     const skipToBreak = async (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -176,6 +222,7 @@ export function PomodoroTimer({ tasks, initialTaskId, onStop, fillHeight = false
         event.stopPropagation();
         if (timerBusy) return;
         await stopWork(selectedTask.id);
+        window.localStorage.removeItem(pomodoroStorageKey(selectedTask.id));
         onStop();
         setAnimateStop(true);
         // Wait for animation to end before resetting state

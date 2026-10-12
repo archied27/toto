@@ -111,7 +111,7 @@ class MediaController:
             result = await registry.dispatch(agent_id, action, payload or {})
         except Exception as exc:
             return {"status": "error", "message": str(exc)}
-        if result.get("status") == "success" and action in {"media_pause", "media_toggle_pause"}:
+        if result.get("status") == "success" and action in {"media_pause", "media_toggle_pause", "media_seek"}:
             await self.update_streaming_progress()
         return result
 

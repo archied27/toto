@@ -5,10 +5,6 @@ import { type WidgetSlot } from "./DashboardPage";
 import { weatherIcon } from "@/plugins/weather/utils";
 import { plugins } from "@/plugins";
 
-interface CompanionModeProps {
-  onOpenCommandBar: () => void;
-}
-
 const pluginMap = Object.fromEntries(plugins.map((p) => [p.id, p]));
 
 function resolveCompanionSlot(
@@ -24,7 +20,7 @@ function resolveCompanionSlot(
   return { id: slot.id, component: <Component /> };
 }
 
-export default function CompanionMode({ onOpenCommandBar }: CompanionModeProps) {
+export default function CompanionMode() {
   const { weather } = useWeather();
   const { slots } = useDashboard();
   const [time, setTime] = useState(new Date());
@@ -109,7 +105,6 @@ export default function CompanionMode({ onOpenCommandBar }: CompanionModeProps) 
   return (
     <div
       className="h-full w-full flex overflow-hidden bg-background"
-      onClick={onOpenCommandBar}
     >
       {/* Left side: Time + weather - scales based on widget presence */}
       <div className={`flex flex-col items-center justify-center transition-all duration-300 ${

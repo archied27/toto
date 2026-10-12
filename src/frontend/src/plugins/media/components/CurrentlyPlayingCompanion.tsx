@@ -161,6 +161,41 @@ export function CurrentlyPlayingCompanion() {
               <Monitor className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">{playing.agent_name}</span>
             </div>
+
+            {hasProgress && (
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  type="range"
+                  min="0"
+                  max={playing.duration_seconds ?? 100}
+                  value={playing.position_seconds ?? 0}
+                  step="1"
+                  onChange={(e) => {
+                    const position = parseInt(e.target.value);
+                    // Dispatch seek to the agent
+                    apiFetch<{ status: string }>(
+                      `/media/${encodeURIComponent(playing.agent_id)}/seek`,
+                      {
+                        method: "POST",
+                        body: JSON.stringify({ position_seconds: position }),
+                      }
+                    )
+                    .then((response) => {
+                      if (response.status !== "success") {
+                        console.error("Seek failed:", response);
+                      }
+                    })
+                    .catch((error) => {
+                      console.error("Seek error:", error);
+                    });
+                  }}
+                  className="flex-1"
+                />
+                <span className="text-xs text-muted-foreground/70">
+                  {formatTime(playing.position_seconds ?? 0)} / {formatTime(playing.duration_seconds ?? 0)}
+                </span>
+              </div>
+            )}
             <Button
               type="button"
               variant="outline"

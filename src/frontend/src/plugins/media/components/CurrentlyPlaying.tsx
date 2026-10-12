@@ -131,6 +131,41 @@ export function CurrentlyPlaying({
                         <Monitor className="h-3.5 w-3.5 shrink-0" />
                         <span>{item.agent_name}</span>
                     </div>
+
+                    {hasProgress && (
+                        <div className="mt-2 flex items-center gap-2">
+                            <input
+                                type="range"
+                                min="0"
+                                max={item.duration_seconds ?? 100}
+                                value={item.position_seconds ?? 0}
+                                step="1"
+                                onChange={(e) => {
+                                    const position = parseInt(e.target.value);
+                                    // Dispatch seek to the agent
+                                    apiFetch<{ status: string }>(
+                                        `/media/${encodeURIComponent(item.agent_id)}/seek`,
+                                        {
+                                            method: "POST",
+                                            body: JSON.stringify({ position_seconds: position }),
+                                        }
+                                    )
+                                    .then((response) => {
+                                        if (response.status !== "success") {
+                                            console.error("Seek failed:", response);
+                                        }
+                                    })
+                                    .catch((error) => {
+                                        console.error("Seek error:", error);
+                                    });
+                                }}
+                                className="flex-1"
+                            />
+                            <span className="text-xs text-muted-foreground/70">
+                                {formatTime(item.position_seconds ?? 0)} / {formatTime(item.duration_seconds ?? 0)}
+                            </span>
+                        </div>
+                    )}
                 </div>
 
                 <Button

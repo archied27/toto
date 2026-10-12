@@ -59,7 +59,7 @@ function AppInner({ pages }: { pages: AppPage[] }) {
         ${anyOverlayOpen ? 'blur-sm brightness-50 pointer-events-none select-none' : ''}`}
       >
         {isLandscape ? (
-          <CompanionMode onOpenCommandBar={() => setIsCommandBar(true)} />
+          <CompanionMode />
         ) : (
           <SwipeNavigator
             pages={pages}
