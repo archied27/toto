@@ -82,16 +82,23 @@ The media plugin controls playback through mpv and searches for movies and TV sh
 ### Web
 The web plugin provides web search (via ddgs) so the command bar and the LLM can answer questions that need up-to-date information.
 
+### Calendar
+The calendar plugin provides a Toto-native day/week calendar backed by a local
+cache of Google Calendar events. It syncs all calendars for one Google account,
+lets the view filter which calendars are visible, and routes Toto-created event
+changes back to Google. See the [calendar plugin plan](docs/calendar-plugin-plan.md)
+for the integration design and current setup decisions.
+
 ## To Do
 ### Plugins
 - [ ] Calendar
 - [ ] Gym Tracker
 - [ ] Finance Tracker
 - [ ] Spotify Integration
-- [ ] Habits
+- [x] Habits
 - [x] Media (movies and tv shows)
 - [ ] Sheet Music Manager (automatic downloads and progression)
-- [ ] Focus/Pomodoro
+- [x] Focus/Pomodoro
 - [ ] Recipe Tracker
 - [ ] Timers
 

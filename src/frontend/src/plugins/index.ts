@@ -3,5 +3,6 @@ import tasks from "./tasks"
 import media from "./media"
 import web from "./web"
 import habits from "./habits"
+import calendar from "./calendar"
 
-export const plugins = [tasks, weather, media, web, habits]
+export const plugins = [tasks, weather, media, web, habits, calendar]

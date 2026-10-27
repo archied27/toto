@@ -60,12 +60,12 @@ export default defineConfig({
   ],
   server: {
     https: {
-      key: fs.readFileSync('../certs/archie-mini-pc.tail802449.ts.net.key'),
-      cert: fs.readFileSync('../certs/archie-mini-pc.tail802449.ts.net.crt'),
+      key: fs.readFileSync('../certs/archlinux.tail802449.ts.net.key'),
+      cert: fs.readFileSync('../certs/archlinux.tail802449.ts.net.crt'),
     },
     host: '0.0.0.0',
     hmr: {
-      host: 'archie-mini-pc.tail802449.ts.net',
+      host: 'archlinux.tail802449.ts.net',
       protocol: 'wss',
       clientPort: 5173
     },
