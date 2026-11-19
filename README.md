@@ -89,12 +89,31 @@ lets the view filter which calendars are visible, and routes Toto-created event
 changes back to Google. See the [calendar plugin plan](docs/calendar-plugin-plan.md)
 for the integration design and current setup decisions.
 
+### Spotify
+The Spotify plugin shows the currently playing track and device, supports
+playback controls, and can sync saved albums into local Albumify-style clusters.
+Clusters are stored in Toto's database, browsable from the Spotify page, and
+clicking an album starts it on the linked Spotify account.
+
+To configure it, create an app in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard),
+add the exact redirect URI `http://localhost:8000/spotify/oauth/callback`, and
+set these values in `src/backend/.env`:
+
+```env
+SPOTIFY_CLIENT_ID=your_client_id
+SPOTIFY_CLIENT_SECRET=your_client_secret
+SPOTIFY_REDIRECT_URI=http://localhost:8000/spotify/oauth/callback
+```
+
+The Spotify account must have an active Spotify playback device. Spotify
+Premium is required for Web API playback control.
+
 ## To Do
 ### Plugins
 - [ ] Calendar
 - [ ] Gym Tracker
 - [ ] Finance Tracker
-- [ ] Spotify Integration
+- [x] Spotify Integration
 - [x] Habits
 - [x] Media (movies and tv shows)
 - [ ] Sheet Music Manager (automatic downloads and progression)

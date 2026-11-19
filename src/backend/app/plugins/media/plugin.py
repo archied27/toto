@@ -1,12 +1,14 @@
 from app.schemas.base_plugin import BasePlugin
 from app.plugins.media.routes import MediaRouter
 from app.plugins.media.controller.controller import MediaController
+from app.plugins.media.command import MediaCommand
 from app.plugins.media.state import MediaState
 
 class MediaPlugin(BasePlugin):
     async def setup(self, core):
         self.core = core
         self.controller = MediaController(core)
+        self.command = MediaCommand(self.controller)
         self.router = MediaRouter(self.controller)
         core.bus.on("media.playing.updated", self.update_dashboard_priority)
 
@@ -28,7 +30,7 @@ class MediaPlugin(BasePlugin):
         return []
 
     def get_command(self):
-        return None
+        return self.command
 
     async def save_state(self):
         pass

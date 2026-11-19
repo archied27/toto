@@ -10,3 +10,4 @@ llama-cpp-python
 dateparser
 openai
 ddgs
+hdbscan

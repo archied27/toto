@@ -17,7 +17,7 @@ export function resolveSlot(
   slot: DashboardSlot | null,
   size: "hero" | "wide" | "small"
 ): WidgetSlot | null {
-  if (!slot) return null;
+  if (!slot?.id) return null;
   const plugin = pluginMap[slot.id];
   const Component = plugin?.widgets[size];
   if (!Component) return null;

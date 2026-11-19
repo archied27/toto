@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { addDays, addWeeks, endOfDay, endOfWeek, format, isSameDay, startOfDay, startOfWeek, subWeeks } from "date-fns";
+import { addDays, addWeeks, endOfWeek, format, isBefore, isSameDay, startOfWeek, subWeeks } from "date-fns";
 import { CalendarDays, ChevronLeft, ChevronRight, CircleAlert, Clock3, Filter, Plus, RefreshCw, Settings2, SlidersHorizontal, X } from "lucide-react";
 import { apiFetch } from "@/hooks/api";
 import { useWebSocketEvent } from "@/hooks/useWebSocketEvent";
@@ -35,7 +35,6 @@ interface CalendarState {
     next_event?: CalendarEvent | null;
 }
 
-type CalendarView = "day" | "week";
 const UK_TIMEZONE = "Europe/London";
 
 function dateValue(value: string) {
@@ -48,8 +47,10 @@ function timeLabel(event: CalendarEvent) {
 }
 
 function EventRow({ event }: { event: CalendarEvent }) {
+    const now = new Date();
+    const isPast = isBefore(dateValue(event.end), now);
     return (
-        <article className="flex gap-3 rounded-xl border border-border/60 bg-card/60 p-3 shadow-sm transition-colors hover:bg-card">
+        <article className={cn("flex gap-3 rounded-xl border border-border/60 bg-card/60 p-3 shadow-sm transition-colors hover:bg-card", isPast && "opacity-50")}>
             <div className="mt-1 h-10 w-1 shrink-0 rounded-full" style={{ backgroundColor: event.colour }} />
             <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
@@ -62,16 +63,16 @@ function EventRow({ event }: { event: CalendarEvent }) {
     );
 }
 
-function DateRail({ date, view, events, onSelect }: { date: Date; view: CalendarView; events: CalendarEvent[]; onSelect: (date: Date) => void }) {
-    const start = view === "day" ? date : startOfWeek(date, { weekStartsOn: 1 });
-    const days = Array.from({ length: view === "day" ? 1 : 7 }, (_, index) => addDays(start, index));
+function DateRail({ date, events, onSelect }: { date: Date; events: CalendarEvent[]; onSelect: (date: Date) => void }) {
+    const start = startOfWeek(date, { weekStartsOn: 1 });
+    const days = Array.from({ length: 7 }, (_, index) => addDays(start, index));
     return (
-        <div className={cn("-mx-1 flex gap-2 overflow-x-auto px-1 pb-1", view === "day" && "sm:grid sm:grid-cols-7 sm:overflow-visible")}>
+        <div className="swiper-no-swiping flex max-w-full gap-3 overflow-x-auto overscroll-x-contain px-3 pb-2 touch-pan-x scrollbar-none">
             {days.map((day) => {
                 const selected = isSameDay(day, date);
                 const today = isSameDay(day, new Date());
                 const count = events.filter((event) => isSameDay(dateValue(event.start), day)).length;
-                return <button key={day.toISOString()} type="button" onClick={() => onSelect(day)} className={cn("min-w-[4.75rem] rounded-xl border px-3 py-2 text-center transition-colors", selected ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-border/60 bg-card/45 hover:bg-card", today && !selected && "border-primary/50")}><span className="block text-[10px] font-semibold uppercase tracking-[0.16em] opacity-75">{format(day, "EEE")}</span><span className="mt-1 block text-lg font-bold">{format(day, "d")}</span><span className="mt-0.5 block text-[11px] opacity-75">{count} event{count === 1 ? "" : "s"}</span></button>;
+                return <button key={day.toISOString()} type="button" onClick={() => onSelect(day)} className={cn("w-[4.75rem] shrink-0 rounded-xl border px-3 py-2 text-center transition-colors", selected ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-border/60 bg-card/45 hover:bg-card", today && !selected && "border-primary/50")}><span className="block text-[10px] font-semibold uppercase tracking-[0.16em] opacity-75">{format(day, "EEE")}</span><span className="mt-1 block text-lg font-bold">{format(day, "d")}</span><span className="mt-0.5 block text-[11px] opacity-75">{count} event{count === 1 ? "" : "s"}</span></button>;
             })}
         </div>
     );
@@ -79,7 +80,6 @@ function DateRail({ date, view, events, onSelect }: { date: Date; view: Calendar
 
 export default function CalendarWorkspace() {
     const [date, setDate] = useState(new Date());
-    const [view, setView] = useState<CalendarView>("day");
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [sources, setSources] = useState<CalendarSource[]>([]);
     const [filtersOpen, setFiltersOpen] = useState(false);
@@ -90,10 +90,9 @@ export default function CalendarWorkspace() {
     const [error, setError] = useState<string | null>(null);
 
     const range = useMemo(() => {
-        if (view === "day") return { start: startOfDay(date), end: endOfDay(date) };
         const start = startOfWeek(date, { weekStartsOn: 1 });
         return { start, end: endOfWeek(date, { weekStartsOn: 1 }) };
-    }, [date, view]);
+    }, [date]);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -120,11 +119,11 @@ export default function CalendarWorkspace() {
     const sourceIds = sources.map((source) => source.id);
     const displayedEvents = events.filter((event) => isVisible(event.source_id, sourceIds));
     const selectedDayEvents = displayedEvents.filter((event) => isSameDay(dateValue(event.start), date));
-    const heading = view === "day" ? format(date, "EEEE, d MMMM") : `${format(range.start, "d MMM")} - ${format(range.end, "d MMM yyyy")}`;
+    const heading = `${format(range.start, "d MMM")} - ${format(range.end, "d MMM yyyy")}`;
     const syncLabel = state?.sync_status === "synced" ? "Synced" : state?.sync_status === "error" ? "Sync needs attention" : "Not connected";
 
     function move(direction: number) {
-        setDate((current) => view === "day" ? addDays(current, direction) : direction > 0 ? addWeeks(current, 1) : subWeeks(current, 1));
+        setDate((current) => direction > 0 ? addWeeks(current, 1) : subWeeks(current, 1));
     }
 
     async function syncNow() {
@@ -149,15 +148,15 @@ export default function CalendarWorkspace() {
                 {state?.last_error && <div className="flex items-start gap-3 rounded-xl border border-amber-400/30 bg-amber-400/[0.06] px-4 py-3 text-xs text-muted-foreground"><CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-300" /><span>Some calendars could not sync: {state.last_error}</span></div>}
                 {error && <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-destructive">{error}</div>}
 
-                <section className="flex items-center justify-between gap-3"><div className="flex items-center gap-1 rounded-lg border border-border/70 bg-background/70 p-1">{(["day", "week"] as CalendarView[]).map((option) => <button key={option} type="button" onClick={() => setView(option)} className={cn("rounded-md px-3 py-1.5 text-xs font-medium capitalize", view === option ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{option}</button>)}</div><Button variant="outline" size="sm" onClick={() => setFiltersOpen((open) => !open)} aria-expanded={filtersOpen}><SlidersHorizontal /> Calendars</Button></section>
+                <section className="flex items-center justify-end gap-3"><Button variant="outline" size="sm" onClick={() => setFiltersOpen((open) => !open)} aria-expanded={filtersOpen}><SlidersHorizontal /> Calendars</Button></section>
 
                 {filtersOpen && <section className="rounded-xl border border-border/70 bg-card/35 p-3 shadow-sm"><div className="mb-3 flex items-center justify-between gap-3"><div className="flex items-center gap-2 text-sm font-semibold"><Filter className="size-4 text-primary" /> Visible calendars</div><Button variant="ghost" size="icon-sm" onClick={() => setFiltersOpen(false)} aria-label="Close calendar filters" title="Close calendar filters"><X /></Button></div><div className="flex flex-wrap gap-2">{sources.map((source) => <button key={source.id} type="button" onClick={() => void toggleSource(source.id, sourceIds)} className={cn("flex items-center gap-2 rounded-full border border-border/70 px-3 py-2 text-xs transition-opacity", !isVisible(source.id, sourceIds) && "opacity-35")}><span className="size-2 rounded-full" style={{ backgroundColor: source.colour }} />{source.name}</button>)}{sources.length === 0 && <span className="text-xs text-muted-foreground">Calendars will appear here after the first sync.</span>}</div></section>}
 
-                <DateRail date={date} view={view} events={displayedEvents} onSelect={setDate} />
+                <DateRail date={date} events={displayedEvents} onSelect={setDate} />
 
-                <section className="rounded-xl border border-border/70 bg-card/35 p-3 shadow-sm sm:p-4"><div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{view === "day" ? "Day agenda" : "Selected day"}</p><h2 className="mt-1 text-lg font-bold">{format(date, "EEEE, d MMMM")}</h2></div><span className="text-xs text-muted-foreground">{selectedDayEvents.length} event{selectedDayEvents.length === 1 ? "" : "s"}</span></div>{loading ? <div className="py-16 text-center text-sm text-muted-foreground">Loading calendar...</div> : selectedDayEvents.length ? <div className="flex flex-col gap-2">{selectedDayEvents.map((event) => <EventRow key={event.id} event={event} />)}</div> : <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">Nothing scheduled for this day.</div>}</section>
+                <section className="rounded-xl border border-border/70 bg-card/35 p-3 shadow-sm sm:p-4"><div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Selected day</p><h2 className="mt-1 text-lg font-bold">{format(date, "EEEE, d MMMM")}</h2></div><span className="text-xs text-muted-foreground">{selectedDayEvents.length} event{selectedDayEvents.length === 1 ? "" : "s"}</span></div>{loading ? <div className="py-16 text-center text-sm text-muted-foreground">Loading calendar...</div> : selectedDayEvents.length ? <div className="flex flex-col gap-2">{selectedDayEvents.map((event) => <EventRow key={event.id} event={event} />)}</div> : <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">Nothing scheduled for this day.</div>}</section>
 
-                {view === "week" && <section className="hidden gap-3 md:grid md:grid-cols-2">{Array.from({ length: 7 }, (_, index) => addDays(startOfWeek(date, { weekStartsOn: 1 }), index)).filter((day) => !isSameDay(day, date)).map((day) => { const dayEvents = displayedEvents.filter((event) => isSameDay(dateValue(event.start), day)); return <button key={day.toISOString()} type="button" onClick={() => setDate(day)} className="rounded-xl border border-border/60 bg-card/45 p-3 text-left transition-colors hover:bg-card"><div className="flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{format(day, "EEE d")}</span><span className="text-xs text-muted-foreground">{dayEvents.length}</span></div><p className="mt-2 truncate text-sm font-medium">{dayEvents[0]?.title ?? "Nothing scheduled"}</p>{dayEvents.length > 1 && <p className="mt-1 text-xs text-muted-foreground">+{dayEvents.length - 1} more</p>}</button>; })}</section>}
+                <section className="hidden gap-3 md:grid md:grid-cols-2">{Array.from({ length: 7 }, (_, index) => addDays(startOfWeek(date, { weekStartsOn: 1 }), index)).filter((day) => !isSameDay(day, date)).map((day) => { const dayEvents = displayedEvents.filter((event) => isSameDay(dateValue(event.start), day)); return <button key={day.toISOString()} type="button" onClick={() => setDate(day)} className="rounded-xl border border-border/60 bg-card/45 p-3 text-left transition-colors hover:bg-card"><div className="flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{format(day, "EEE d")}</span><span className="text-xs text-muted-foreground">{dayEvents.length}</span></div><p className="mt-2 truncate text-sm font-medium">{dayEvents[0]?.title ?? "Nothing scheduled"}</p>{dayEvents.length > 1 && <p className="mt-1 text-xs text-muted-foreground">+{dayEvents.length - 1} more</p>}</button>; })}</section>
 
                 <footer className="flex items-center justify-between text-xs text-muted-foreground"><span className="flex items-center gap-2"><Clock3 className="size-3.5" />{state?.last_synced_at ? `Last synced ${format(dateValue(state.last_synced_at), "d MMM, HH:mm")}` : "Waiting for first sync"}</span><span>{displayedEvents.length} event{displayedEvents.length === 1 ? "" : "s"} in range</span></footer>
             </div>

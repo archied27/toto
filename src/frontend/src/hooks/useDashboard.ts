@@ -3,7 +3,8 @@ import { apiFetch } from "./api";
 import { useWebSocketEvent } from "./useWebSocketEvent";
 
 export interface DashboardSlot {
-    id: string;
+    id: string | null;
+    priority: number;
 }
 
 export interface DashboardState {
