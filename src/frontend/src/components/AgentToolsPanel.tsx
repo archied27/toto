@@ -707,8 +707,7 @@ export default function AgentToolsPanel({
           </div>
         </div>
 
-        {/* A pending write confirmation replaces the list so the dialog
-            isn't buried under it (same pattern as CommandBar). */}
+        {/* The confirmation dialog is portaled above the agent list. */}
         {parameterTool ? (
           <ToolParameterForm
             agent={parameterTool.agent}

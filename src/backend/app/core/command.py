@@ -116,9 +116,10 @@ class CommandRouter:
         payload = json.dumps(jsonable_encoder(result.data)) if result.data else ""
         return "\n".join(part for part in (result.response_text, payload) if part)
         
-    async def _llm_stream(self, raw: str):
+    async def _llm_stream(self, raw: str, history: list[dict] | None = None):
         messages = [
             {"role": "system", "content": TOOL_SYSTEM_PROMPT},
+            *(history or []),
             {"role": "user", "content": raw},
         ]
 
@@ -330,13 +331,13 @@ class CommandRouter:
             "content": "I couldn't complete the request because too many tool calls were required.",
         }
 
-    async def _run_llm_stream(self, raw: str):
+    async def _run_llm_stream(self, raw: str, history: list[dict] | None = None):
         """Stream the general LLM (with tool calling) to completion, then yield
         the terminal result.  Shared by the low-confidence fallback and the
         explicit "llm" command mode."""
         try:
             answer_parts = []
-            async for event in self._llm_stream(raw):
+            async for event in self._llm_stream(raw, history):
                 if event["type"] == "text":
                     answer_parts.append(event["content"])
                 yield event
@@ -355,7 +356,12 @@ class CommandRouter:
                 data={},
             )}
 
-    async def process_stream(self, raw: str, mode: str = "normal"):
+    async def process_stream(
+        self,
+        raw: str,
+        mode: str = "normal",
+        history: list[dict] | None = None,
+    ):
         if not raw or not raw.strip():
             yield {"type": "result", "result": CommandResult(success=False, action='EMPTY', response_text="Nothing to process", data={})}
             return
@@ -365,7 +371,7 @@ class CommandRouter:
 
         if mode == "llm":
             # Explicit "straight to LLM" mode — skip the classifier entirely.
-            async for event in self._run_llm_stream(raw):
+            async for event in self._run_llm_stream(raw, history):
                 yield event
             return
 

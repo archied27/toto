@@ -1,12 +1,12 @@
 import { useRef, useEffect, useState } from "react";
 
 interface TaskTabsProps {
-  currentTab: "Today" | "Tomorrow" | "Upcoming" | "All";
-  onTabChange: (tab: "Today" | "Tomorrow" | "Upcoming" | "All") => void;
+  currentTab: "Today" | "Tomorrow" | "Upcoming" | "All" | "Stats";
+  onTabChange: (tab: "Today" | "Tomorrow" | "Upcoming" | "All" | "Stats") => void;
 }
 
 export default function TaskTabs({ currentTab, onTabChange }: TaskTabsProps) {
-  const tabs = ["All", "Today", "Tomorrow", "Upcoming"] as const;
+  const tabs = ["All", "Today", "Tomorrow", "Upcoming", "Stats"] as const;
   const containerRef = useRef<HTMLDivElement>(null);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
 

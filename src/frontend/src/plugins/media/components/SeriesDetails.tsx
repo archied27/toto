@@ -25,7 +25,12 @@ export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: (
         const fetchSeriesDetails = async () => {
             const details = await getSeriesDetails();
             setSeriesDetails(details);
-            setSelectedSeason(details?.seasons[0] || null);
+            if (details) {
+                const resume = findResumeTarget(details);
+                setSelectedSeason(details.seasons[resume.seasonNumber - 1] || details.seasons[0] || null);
+            } else {
+                setSelectedSeason(null);
+            }
         };
 
         fetchSeriesDetails();
@@ -64,20 +69,33 @@ export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: (
         setPickerOpen(true);
     };
 
-    const streamEpisodeOnAgent = async (agent: MediaAgent) => {
-        if (!pendingEpisode) return;
+    const handlePlayOrStream = (agent?: MediaAgent) => {
+        if (!seriesDetails) return;
+        const resume = findResumeTarget(seriesDetails);
+        if (agent) {
+            void streamEpisodeOnAgentForTarget(agent, resume);
+        } else {
+            setPendingEpisode({
+                season: resume.seasonNumber,
+                episode: resume.episodeNumber,
+                startSeconds: resume.startSeconds,
+            });
+            setPickerOpen(true);
+        }
+    };
+
+    const streamEpisodeOnAgentForTarget = async (agent: MediaAgent, target: ResumeTarget) => {
         try {
             setStreaming(true);
             const payload: Record<string, unknown> = {
                 media_type: "series",
                 tmdb_id: seriesId,
-                season_number: pendingEpisode.season,
-                episode_number: pendingEpisode.episode,
+                season_number: target.seasonNumber,
+                episode_number: target.episodeNumber,
                 agent_id: agent.device_id,
             };
-            // Include start_seconds if provided (for continue watching)
-            if (pendingEpisode.startSeconds !== undefined && pendingEpisode.startSeconds > 0) {
-                payload.start_seconds = Math.floor(pendingEpisode.startSeconds);
+            if (target.startSeconds !== undefined && target.startSeconds > 0) {
+                payload.start_seconds = Math.floor(target.startSeconds);
             }
             await apiFetch("/media/stream", {
                 method: "POST",
@@ -89,6 +107,15 @@ export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: (
         } finally {
             setStreaming(false);
         }
+    };
+
+    const streamEpisodeOnAgent = async (agent: MediaAgent) => {
+        if (!pendingEpisode) return;
+        await streamEpisodeOnAgentForTarget(agent, {
+            seasonNumber: pendingEpisode.season,
+            episodeNumber: pendingEpisode.episode,
+            startSeconds: pendingEpisode.startSeconds,
+        });
     };
 
     if (loading) {
@@ -171,6 +198,8 @@ export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: (
                     <div className="flex gap-2.5 mb-6">
                         <Button
                             variant="outline"
+                            onClick={() => handlePlayOrStream()}
+                            disabled={streaming}
                             className="flex-1 h-auto flex-col gap-1.5 py-3 rounded-2xl bg-white text-black hover:bg-white/90 shadow-sm active:scale-[0.97] transition-transform duration-150"
                         >
                             <Play className="w-[18px] h-[18px]" fill="white" strokeWidth={0} />
@@ -179,6 +208,8 @@ export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: (
 
                         <Button
                             variant="outline"
+                            onClick={() => handlePlayOrStream()}
+                            disabled={streaming}
                             className="flex-1 h-auto flex-col gap-1.5 py-3 rounded-2xl bg-white/[0.06] border border-white/10 text-white/90 hover:bg-white/10 hover:text-white active:scale-[0.97] transition-transform duration-150"
                         >
                             <Cast className="w-[18px] h-[18px]" strokeWidth={1.75} />
@@ -311,4 +342,62 @@ export function SeriesDetails({ seriesId, close }: { seriesId: number; close?: (
             />
         </div>
     );
+}
+
+interface ResumeTarget {
+    seasonNumber: number;
+    episodeNumber: number;
+    startSeconds?: number;
+}
+
+function findResumeTarget(details: FullSeriesDetails): ResumeTarget {
+    let latest: (ResumeTarget & { lastWatched?: string }) | null = null;
+
+    for (let seasonIndex = 0; seasonIndex < details.seasons.length; seasonIndex += 1) {
+        const season = details.seasons[seasonIndex];
+        for (const episode of season.episodes) {
+            if ((episode.position_seconds ?? 0) <= 0) continue;
+
+            const candidate: ResumeTarget & { lastWatched?: string } = {
+                seasonNumber: seasonIndex + 1,
+                episodeNumber: episode.episode_num,
+                startSeconds: Math.floor(episode.position_seconds ?? 0),
+                lastWatched: episode.last_watched,
+            };
+            if (!latest || (candidate.lastWatched || "") > (latest.lastWatched || "")) {
+                latest = candidate;
+            }
+        }
+    }
+
+    const resume = latest;
+    if (!resume) {
+        return { seasonNumber: 1, episodeNumber: 1 };
+    }
+
+    const targetSeasonIndex = resume.seasonNumber - 1;
+    const season = details.seasons[targetSeasonIndex];
+    const episodeIndex = season?.episodes.findIndex((episode) => episode.episode_num === resume.episodeNumber) ?? -1;
+    const episode = episodeIndex >= 0 ? season.episodes[episodeIndex] : undefined;
+
+    if (episode?.completed === 1) {
+        if (episodeIndex >= 0 && episodeIndex + 1 < (season?.episodes.length ?? 0)) {
+            return {
+                seasonNumber: resume.seasonNumber,
+                episodeNumber: season.episodes[episodeIndex + 1].episode_num,
+            };
+        }
+        if (targetSeasonIndex + 1 < details.seasons.length) {
+            return {
+                seasonNumber: targetSeasonIndex + 2,
+                episodeNumber: details.seasons[targetSeasonIndex + 1].episodes[0]?.episode_num ?? 1,
+            };
+        }
+    }
+
+    return {
+        seasonNumber: resume.seasonNumber,
+        episodeNumber: resume.episodeNumber,
+        startSeconds: resume.startSeconds,
+    };
 }

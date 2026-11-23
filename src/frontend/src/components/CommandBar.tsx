@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Textarea } from "./ui/textarea";
 import {
   DropdownMenu,
@@ -10,15 +10,17 @@ import { useNavigation } from "@/hooks/NavigationContext";
 import CommandResultRenderer from "./CommandResultRenderer";
 import StreamingLLMResponse from "./StreamingLLMResponse";
 import WriteConfirmDialog from "./WriteConfirmDialog";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 import type { CommandResult } from "@/plugins/types";
 import {
   BrainIcon,
   ZapIcon,
   LoaderCircleIcon,
-  TriangleAlertIcon,
   XIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+type ChatMessage = { role: "user" | "assistant"; content: string };
 
 // The event vocabulary emitted by POST /command/stream.
 type StreamEvent =
@@ -89,8 +91,27 @@ export default function CommandBar({
     title: string;
     args: Record<string, unknown>;
   } | null>(null);
-  const [mode, setMode] = useState<"normal" | "llm">("normal");
+  const [mode, setMode] = useState<"normal" | "llm">("llm");
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const { navigate } = useNavigation();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Focus the textarea on mount
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
+
+  // Close the command window on Escape in dedicated mode
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("command") !== "1") return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") window.close();
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, []);
 
   // POST to /command/confirm-write with the user's decision, then clear
   // the dialog.  The backend resumes the paused LLM stream accordingly.
@@ -106,13 +127,22 @@ export default function CommandBar({
   };
 
   const handleSubmit = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key !== "Enter" || !searchTerm.trim()) return;
+    if (e.key !== "Enter" || e.shiftKey || !searchTerm.trim()) return;
     // The textarea would otherwise insert a newline on Enter — submit instead.
     e.preventDefault();
 
     setLoading(true);
     setResult(null);
     setStreaming(null);
+    const input = searchTerm.trim();
+    const history = mode === "llm" ? chatHistory : [];
+    if (mode === "llm") {
+      setChatHistory((messages) => [
+        ...messages,
+        { role: "user", content: input },
+      ]);
+    }
+    setSearchTerm("");
 
     // Tracked locally so each event re-sets the full streaming state.
     let content = "";
@@ -122,7 +152,7 @@ export default function CommandBar({
       const res = await fetch("/command/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: searchTerm, mode }),
+        body: JSON.stringify({ input, mode, history }),
       });
 
       if (!res.ok || !res.body) {
@@ -164,6 +194,12 @@ export default function CommandBar({
           if (r.success && r.action === "LLM_RESPONSE") {
             // The streaming view already shows the full answer — keep it.
             setStreaming({ tools, content });
+            if (mode === "llm") {
+              setChatHistory((messages) => [
+                ...messages,
+                { role: "assistant", content },
+              ]);
+            }
           } else {
             // Data card or error — render through the normal renderer.
             setStreaming(null);
@@ -175,7 +211,6 @@ export default function CommandBar({
       console.error("Command error:", err);
     } finally {
       setLoading(false);
-      setMode("normal");
     }
   };
 
@@ -195,8 +230,6 @@ export default function CommandBar({
           </div>
         )}
 
-        {/* A pending write confirmation sits at the top, replacing the
-            long widget below so the dialog isn't buried under content. */}
         {pendingWrite && (
           <WriteConfirmDialog
             title={pendingWrite.title}
@@ -204,6 +237,30 @@ export default function CommandBar({
             onConfirm={() => resolveWrite(true)}
             onCancel={() => resolveWrite(false)}
           />
+        )}
+        {chatHistory.length > 0 && (
+          <div className="mb-4 space-y-3">
+            {(streaming && chatHistory.at(-1)?.role === "assistant"
+              ? chatHistory.slice(0, -1)
+              : chatHistory
+            ).map((message, index) => (
+              <div
+                key={`${message.role}-${index}`}
+                className={cn(
+                  "rounded-xl px-3 py-2 text-sm",
+                  message.role === "user"
+                    ? "ml-8 bg-primary text-primary-foreground"
+                    : "mr-4 bg-muted"
+                )}
+              >
+                {message.role === "assistant" ? (
+                  <MarkdownRenderer content={message.content} />
+                ) : (
+                  message.content
+                )}
+              </div>
+            ))}
+          </div>
         )}
         {result ? (
           <CommandResultRenderer result={result} onResult={setResult} />
@@ -227,10 +284,10 @@ export default function CommandBar({
               disabled={loading}
               className="shrink-0 p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {mode === "normal" ? (
-                <ZapIcon className="w-5 h-5" />
-              ) : (
+              {mode === "llm" ? (
                 <BrainIcon className="w-5 h-5" />
+              ) : (
+                <ZapIcon className="w-5 h-5" />
               )}
             </button>
           </DropdownMenuTrigger>
@@ -243,7 +300,7 @@ export default function CommandBar({
               )}
             >
               <ZapIcon className="w-4 h-4" />
-              Normal
+              Fast
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => setMode("llm")}
@@ -259,6 +316,7 @@ export default function CommandBar({
         </DropdownMenu>
         <div className="relative w-full">
           <Textarea
+            ref={textareaRef}
             className="text-foreground pr-10 leading-5 min-h-9 max-h-[calc(3_*_1.25rem_+_1rem_+_2px)] resize-none overflow-y-auto"
             placeholder="Type a command..."
             value={searchTerm}
@@ -266,11 +324,7 @@ export default function CommandBar({
             onKeyDown={handleSubmit}
             disabled={loading}
           />
-          {loading && pendingWrite ? (
-            // A write is awaiting confirmation — a warning instead of the
-            // spinner signals the user needs to act.
-            <TriangleAlertIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-amber-500 animate-pulse" />
-          ) : loading ? (
+          {loading ? (
             <LoaderCircleIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground animate-spin" />
           ) : (
             searchTerm && (

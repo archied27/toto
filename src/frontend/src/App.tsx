@@ -25,6 +25,26 @@ function AppInner({ pages }: { pages: AppPage[] }) {
 
   const [isCommandBar, setIsCommandBar] = useState(false)
   const [isAgentTools, setIsAgentTools] = useState(false)
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('command') === '1') {
+      setIsCommandBar(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isCommandBar) return
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsCommandBar(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [isCommandBar])
+
   const pageIds = pages.map(page => page.id)
 
   const anyOverlayOpen = isCommandBar || isAgentTools

@@ -28,6 +28,9 @@ class SpotifyPlugin(BasePlugin):
         await core.db_manager.execute(
             "CREATE TABLE IF NOT EXISTS spotify_cluster_names (cluster INTEGER PRIMARY KEY, name TEXT NOT NULL)"
         )
+        await core.db_manager.execute(
+            "CREATE TABLE IF NOT EXISTS spotify_album_tags (album_id TEXT NOT NULL, tag TEXT NOT NULL, weight REAL NOT NULL DEFAULT 0, PRIMARY KEY (album_id, tag))"
+        )
         core.bus.on("spotify.refresh", self.refresh)
         core.scheduler.add_recurring("spotify.refresh", second="*/15")
 
@@ -72,12 +75,32 @@ class SpotifyPlugin(BasePlugin):
                 "cover_image": (album.get("images") or [{}])[0].get("url"),
             })
         labels = cluster_albums(albums)
+        saved_ids = {album["id"] for album in albums}
+        existing_rows = await self.core.db_manager.fetch_all("SELECT id FROM spotify_albums")
+        for existing in existing_rows:
+            if existing["id"] not in saved_ids:
+                await self.core.db_manager.execute("DELETE FROM spotify_album_tags WHERE album_id = ?", [existing["id"]])
+                await self.core.db_manager.execute("DELETE FROM spotify_albums WHERE id = ?", [existing["id"]])
+        genre_counts = {}
+        for album in albums:
+            for genre in album["genres"]:
+                genre_counts[genre] = genre_counts.get(genre, 0) + 1
+        max_tag_count = max(genre_counts.values(), default=1)
         for album in albums:
             album["cluster"] = labels[album["id"]]
             await self.core.db_manager.execute(
                 "INSERT OR REPLACE INTO spotify_albums (id, name, artist, release_date, popularity, avg_duration, genres, cover_image, cluster) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [album["id"], album["name"], album["artist"], album["release_date"], album["popularity"], album["avg_duration"], ",".join(album["genres"]), album["cover_image"], album["cluster"]],
             )
+            await self.core.db_manager.execute("DELETE FROM spotify_album_tags WHERE album_id = ?", [album["id"]])
+            popularity_weight = max(0.0, min(1.0, float(album["popularity"] or 0) / 100.0))
+            for genre in album["genres"]:
+                frequency_weight = genre_counts[genre] / max_tag_count
+                tag_weight = round((popularity_weight * 0.7) + (frequency_weight * 0.3), 4)
+                await self.core.db_manager.execute(
+                    "INSERT OR REPLACE INTO spotify_album_tags (album_id, tag, weight) VALUES (?, ?, ?)",
+                    [album["id"], genre, tag_weight],
+                )
         return {"count": len(albums), "clusters": grouped_albums(albums, await self.cluster_names())}
 
     async def cluster_names(self):
@@ -132,6 +155,8 @@ class SpotifyPlugin(BasePlugin):
                 "device": playback.get("device", {}).get("name"),
                 "device_type": playback.get("device", {}).get("type"),
                 "volume_percent": playback.get("device", {}).get("volume_percent"),
+                "shuffle_state": bool(playback.get("shuffle_state")),
+                "repeat_state": playback.get("repeat_state", "off"),
             }
 
         dashboard_priority = 0
@@ -157,3 +182,74 @@ class SpotifyPlugin(BasePlugin):
         self.core.bus.emit_no_wait("dashboard.rerank")
         self.core.bus.emit_no_wait("pages.rerank")
         return asdict(self.state)
+
+    async def recluster_albums(self):
+        rows = [dict(row) for row in await self.core.db_manager.fetch_all("SELECT * FROM spotify_albums")]
+        for row in rows:
+            row["genres"] = [genre for genre in row["genres"].split(",") if genre]
+
+        labels = cluster_albums(rows)
+        for row in rows:
+            cluster_id = labels[row["id"]]
+            row["cluster"] = cluster_id
+            await self.core.db_manager.execute(
+                "UPDATE spotify_albums SET cluster = ? WHERE id = ?",
+                [cluster_id, row["id"]],
+            )
+
+        return {"count": len(rows), "clusters": grouped_albums(rows, await self.cluster_names())}
+
+    async def album_detail(self, album_id: str):
+        album = await self.client.album(album_id)
+        row = await self.core.db_manager.fetch_one("SELECT genres, popularity, cluster FROM spotify_albums WHERE id = ?", [album_id])
+        if row:
+            tag_rows = await self.core.db_manager.fetch_all(
+                "SELECT tag, weight FROM spotify_album_tags WHERE album_id = ? ORDER BY weight DESC, tag ASC",
+                [album_id],
+            )
+            tags = [{"name": tag_row["tag"], "weight": round(float(tag_row["weight"]), 4)} for tag_row in tag_rows]
+            if not tags:
+                genre_names = [genre for genre in (row["genres"] or "").split(",") if genre]
+                popularity = float(row["popularity"] or 0)
+                tags = [{"name": genre, "weight": round((popularity / 100) * 0.7 + 0.3, 4)} for genre in genre_names]
+        else:
+            tags = []
+            genre_names = album.pop("genres", [])
+            popularity = float(album.get("popularity") or 0)
+            tags = [{"name": genre, "weight": round((popularity / 100) * 0.7 + 0.3, 4)} for genre in genre_names]
+        album["tags"] = tags
+        return album
+
+    async def albums_by_tag(self, tag: str):
+        tag_name = tag.strip().lower()
+        rows = await self.core.db_manager.fetch_all(
+            "SELECT a.*, t.weight AS tag_weight FROM spotify_albums a LEFT JOIN spotify_album_tags t ON t.album_id = a.id AND lower(t.tag) = lower(?)",
+            [tag],
+        )
+        matches = []
+        for row in rows:
+            genres = [genre.strip() for genre in (row["genres"] or "").split(",") if genre.strip()]
+            persisted_weight = row["tag_weight"]
+            if persisted_weight is not None:
+                weight = float(persisted_weight)
+            elif any(genre.lower() == tag_name for genre in genres):
+                popularity_weight = max(0.0, min(1.0, float(row["popularity"] or 0) / 100.0))
+                weight = round((popularity_weight * 0.7) + 0.3, 4)
+            else:
+                continue
+            matches.append({
+                "id": row["id"],
+                "name": row["name"],
+                "artist": row["artist"],
+                "release_date": row["release_date"],
+                "cover_image": row["cover_image"],
+                "weight": round(weight, 4),
+            })
+        return sorted(matches, key=lambda album: (-album["weight"], album["artist"].lower(), album["name"].lower()))
+
+    async def album_tags(self, album_id: str):
+        rows = await self.core.db_manager.fetch_all(
+            "SELECT tag, weight FROM spotify_album_tags WHERE album_id = ? ORDER BY weight DESC, tag ASC",
+            [album_id],
+        )
+        return [{"name": row["tag"], "weight": round(float(row["weight"]), 4)} for row in rows]

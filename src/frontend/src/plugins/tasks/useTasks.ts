@@ -486,3 +486,60 @@ export function useEditTask() {
 
     return { editTask, loading };
 }
+
+export interface FocusStatsDay {
+    date: string;
+    seconds: number;
+    sessions: number;
+}
+
+export interface FocusStatsLabel {
+    id: number;
+    name: string;
+    colour: string;
+    seconds: number;
+    sessions: number;
+}
+
+export interface FocusStatsTask {
+    task_id: number;
+    title: string;
+    seconds: number;
+    sessions: number;
+}
+
+export interface FocusStats {
+    days: number;
+    total_seconds: number;
+    recorded_seconds: number;
+    active_seconds: number;
+    this_week_seconds: number;
+    session_count: number;
+    focus_days: number;
+    average_session_seconds: number;
+    longest_streak: number;
+    current_streak: number;
+    best_day: string | null;
+    best_day_seconds: number;
+    daily: FocusStatsDay[];
+    labels: FocusStatsLabel[];
+    tasks: FocusStatsTask[];
+}
+
+export function useFocusStats(initialDays = 7) {
+    const [days, setDays] = useState(initialDays);
+    const [stats, setStats] = useState<FocusStats | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    const refetch = useCallback(() => {
+        setLoading(true);
+        apiFetch<FocusStats>(`/tasks/focus_stats?days=${days}`)
+            .then(setStats)
+            .catch(() => console.error("Failed to fetch focus statistics"))
+            .finally(() => setLoading(false));
+    }, [days]);
+
+    useEffect(() => { refetch(); }, [refetch]);
+
+    return { stats, days, setDays, loading, refetch };
+}

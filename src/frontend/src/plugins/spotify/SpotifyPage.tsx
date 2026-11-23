@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Album, ArrowLeft, Check, Laptop2, Pause, Pencil, Play, RefreshCw, SkipBack, SkipForward, Smartphone, Volume2, WifiOff, X } from "lucide-react";
+import { Album, ArrowLeft, Check, LoaderCircle, Pause, Pencil, Play, Repeat, Repeat1, RefreshCw, Shuffle, SkipBack, SkipForward, WifiOff, X } from "lucide-react";
 import { apiFetch } from "@/hooks/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { WidgetContainer } from "@/components/WidgetContainer";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface SpotifyTrack {
     is_playing: boolean;
@@ -13,6 +14,19 @@ interface SpotifyTrack {
     album_image?: string | null;
     device?: string | null;
     device_type?: string | null;
+    volume_percent?: number | null;
+    progress_ms?: number;
+    duration_ms?: number;
+    shuffle_state?: boolean;
+    repeat_state?: "off" | "track" | "context";
+}
+
+interface SpotifyDevice {
+    id: string;
+    name: string;
+    type: string;
+    is_active: boolean;
+    is_restricted: boolean;
     volume_percent?: number | null;
 }
 
@@ -36,8 +50,15 @@ interface SpotifyAlbum {
     release_date?: string | null;
 }
 
-function DeviceIcon({ type }: { type?: string | null }) {
-    return type === "computer" ? <Laptop2 className="size-4" /> : <Smartphone className="size-4" />;
+interface SpotifyAlbumDetail {
+    id: string;
+    name: string;
+    artist: string;
+    cover_image?: string | null;
+    release_date?: string | null;
+    label?: string | null;
+    popularity?: number;
+    tracks: Array<{ id: string | null; name: string; duration_ms: number; track_number: number; explicit: boolean }>;
 }
 
 export function SpotifyPage() {
@@ -65,6 +86,10 @@ function SpotifySurface({ fullPage = false, hero = false, wide = false }: { full
     const [syncing, setSyncing] = useState(false);
     const [editingClusterId, setEditingClusterId] = useState<number | null>(null);
     const [clusterName, setClusterName] = useState("");
+    const [devices, setDevices] = useState<SpotifyDevice[]>([]);
+    const [selectedAlbum, setSelectedAlbum] = useState<SpotifyAlbumDetail | null>(null);
+    const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
+    const [playingAlbumId, setPlayingAlbumId] = useState<string | null>(null);
 
     const refresh = async () => {
         try {
@@ -86,13 +111,18 @@ function SpotifySurface({ fullPage = false, hero = false, wide = false }: { full
         void apiFetch<SpotifyCluster[]>("/spotify/clusters").then(setClusters).catch(() => undefined);
     }, [fullPage, state?.connected]);
 
+    useEffect(() => {
+        if (!state?.connected) return;
+        void apiFetch<SpotifyDevice[]>("/spotify/devices").then(setDevices).catch(() => undefined);
+    }, [state?.connected]);
+
     if (wide) {
         return (
             <WidgetContainer className="bg-card/60 p-0">
                 {!state?.connected ? (
                     <div className="flex h-full items-center px-4 text-sm text-muted-foreground">Spotify is not connected</div>
                 ) : !state.current ? (
-                    <div className="flex h-full items-center px-4 text-sm text-muted-foreground">Nothing playing</div>
+                    null
                 ) : (
                     <div className="flex h-full min-w-0 items-center gap-3 px-3 py-2">
                         {state.current.album_image && (
@@ -132,14 +162,30 @@ function SpotifySurface({ fullPage = false, hero = false, wide = false }: { full
     const syncAlbums = async () => {
         setSyncing(true);
         try {
-            const result = await apiFetch<{ clusters: SpotifyCluster[] }>("/spotify/albums/sync", { method: "POST" });
+            const result = await apiFetch<{ clusters: SpotifyCluster[] }>('/spotify/albums/sync', { method: 'POST' });
             setClusters(result.clusters);
             setSelectedCluster(null);
             setError(null);
         } catch (requestError) {
-            setError(requestError instanceof Error ? requestError.message : "Album sync failed");
+            setError(requestError instanceof Error ? requestError.message : 'Album sync failed');
         } finally {
             setSyncing(false);
+        }
+    };
+
+    const setShuffle = async (shuffleState: boolean) => {
+        try {
+            setState(await apiFetch<SpotifyState>(`/spotify/shuffle?shuffle_state=${shuffleState}`, { method: "POST" }));
+        } catch (requestError) {
+            setError(requestError instanceof Error ? requestError.message : "Shuffle change failed");
+        }
+    };
+
+    const setRepeat = async (repeatState: "off" | "track" | "context") => {
+        try {
+            setState(await apiFetch<SpotifyState>(`/spotify/repeat?repeat_state=${repeatState}`, { method: "POST" }));
+        } catch (requestError) {
+            setError(requestError instanceof Error ? requestError.message : "Repeat change failed");
         }
     };
 
@@ -176,13 +222,51 @@ function SpotifySurface({ fullPage = false, hero = false, wide = false }: { full
         }
     };
 
-    const playAlbum = async (album: SpotifyAlbum) => {
-        setBusy(true);
+    const openAlbum = async (album: SpotifyAlbum) => {
+        setPlayingAlbumId(null);
         try {
-            setState(await apiFetch<SpotifyState>(`/spotify/albums/${album.id}/play`, { method: "POST" }));
+            setSelectedAlbum(await apiFetch<SpotifyAlbumDetail>(`/spotify/albums/${album.id}`));
+            setAlbumDialogOpen(true);
+            setError(null);
+        } catch (requestError) {
+            setError(requestError instanceof Error ? requestError.message : "Unable to load album");
+        }
+    };
+
+    const playAlbum = async (album: SpotifyAlbum, deviceId?: string) => {
+        setBusy(true);
+        setPlayingAlbumId(album.id);
+        try {
+            const suffix = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : "";
+            setState(await apiFetch<SpotifyState>(`/spotify/albums/${album.id}/play${suffix}`, { method: "POST" }));
             setError(null);
         } catch (requestError) {
             setError(requestError instanceof Error ? requestError.message : "Album playback failed");
+        } finally {
+            setBusy(false);
+            window.setTimeout(() => setPlayingAlbumId(null), 700);
+        }
+    };
+
+    const playTrack = async (trackId: string) => {
+        setBusy(true);
+        try {
+            setState(await apiFetch<SpotifyState>(`/spotify/tracks/${trackId}/play`, { method: "POST" }));
+            setError(null);
+        } catch (requestError) {
+            setError(requestError instanceof Error ? requestError.message : "Track playback failed");
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const transferPlayback = async (deviceId: string) => {
+        setBusy(true);
+        try {
+            setState(await apiFetch<SpotifyState>(`/spotify/devices/${deviceId}/transfer`, { method: "POST" }));
+            setError(null);
+        } catch (requestError) {
+            setError(requestError instanceof Error ? requestError.message : "Unable to transfer playback");
         } finally {
             setBusy(false);
         }
@@ -195,27 +279,27 @@ function SpotifySurface({ fullPage = false, hero = false, wide = false }: { full
             <Button size="sm" onClick={() => void connect()}>Connect Spotify</Button>
             {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
-    ) : !state.current ? (
-        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Nothing playing</div>
-    ) : (
+    ) : !state.current ? null : (
         <div className="relative flex h-full min-h-0 overflow-hidden rounded-md">
             {state.current.album_image && <img src={state.current.album_image} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-90 blur-lg" />}
-            <div className="absolute inset-0 bg-black/25" />
-            <div className={`relative z-10 flex min-h-0 min-w-0 flex-1 ${hero ? "flex-col items-center gap-2 p-3 text-center sm:gap-4 sm:p-6" : "flex-col items-center justify-between gap-4 p-3 text-center sm:flex-row sm:items-stretch sm:text-left"}`}>
-                {state.current.album_image && <img src={state.current.album_image} alt={`${state.current.album} album art`} className={`aspect-square shrink-0 rounded-md object-cover shadow-lg ${hero ? "h-auto max-h-[65%] w-auto max-w-full sm:size-52 sm:max-h-none" : "size-40 sm:size-36"}`} />}
-                <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${hero ? "w-full items-center gap-0" : "justify-between"}`}>
+            <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/55 to-black/30" />
+            <div className={`relative z-10 flex min-h-0 min-w-0 flex-1 ${hero ? "mx-auto w-full max-w-md flex-col items-center justify-start gap-3 overflow-hidden p-3 text-center sm:p-4" : "flex-col items-center justify-between gap-4 p-3 text-center sm:flex-row sm:items-stretch sm:text-left"}`}>
+                {state.current.album_image && <img src={state.current.album_image} alt={`${state.current.album} album art`} className={`shrink-0 rounded-md object-cover object-center shadow-lg ${hero ? "aspect-square size-32 sm:size-40" : "aspect-square size-40 sm:size-36"}`} />}
+                <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${hero ? "w-full items-center justify-center gap-1" : "justify-between"}`}>
                 <div className={`min-w-0 ${hero ? "w-full text-center" : ""}`}>
-                    <p className="truncate text-sm font-semibold">{state.current.track}</p>
-                    <p className="truncate text-xs text-muted-foreground">{state.current.artists}</p>
-                    <p className="mt-1 truncate text-[11px] text-muted-foreground/80">{state.current.album}</p>
+                    <p className="truncate text-sm font-semibold text-white drop-shadow-md">{state.current.track}</p>
+                    <p className="truncate text-xs text-white/75 drop-shadow-md">{state.current.artists}</p>
+                    <p className="mt-1 truncate text-[11px] text-white/65 drop-shadow-md">{state.current.album}</p>
                 </div>
                 <div>
-                    <div className="flex items-center gap-3">
+                    <div className={`flex items-center ${hero ? "justify-center gap-1 sm:gap-3" : "gap-3"}`}>
+                        <Button variant="ghost" size="icon-sm" aria-label="Shuffle" title="Shuffle" onClick={() => void setShuffle(!state.current?.shuffle_state)}><Shuffle className={state.current?.shuffle_state ? "text-primary" : "text-muted-foreground"} /></Button>
                         <Button variant="ghost" size="icon-sm" aria-label="Previous track" title="Previous track" disabled={busy} onClick={() => void control("previous")}><SkipBack /></Button>
                         <Button variant="default" size="icon-sm" aria-label={state.current.is_playing ? "Pause" : "Play"} title={state.current.is_playing ? "Pause" : "Play"} disabled={busy} onClick={() => void control(state.current?.is_playing ? "pause" : "play")}>{state.current.is_playing ? <Pause /> : <Play />}</Button>
                         <Button variant="ghost" size="icon-sm" aria-label="Next track" title="Next track" disabled={busy} onClick={() => void control("next")}><SkipForward /></Button>
+                        <Button variant="ghost" size="icon-sm" aria-label="Repeat" title="Repeat" onClick={() => void setRepeat(state.current?.repeat_state === "off" ? "context" : state.current?.repeat_state === "context" ? "track" : "off")}>{state.current?.repeat_state === "track" ? <Repeat1 /> : <Repeat className={state.current?.repeat_state === "context" ? "text-primary" : "text-muted-foreground"} />}</Button>
                     </div>
-                    {!hero && <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground"><DeviceIcon type={state.current.device_type} /><span className="truncate">{state.current.device || "Unknown device"}</span><Volume2 className="ml-auto size-3.5" /><span>{state.current.volume_percent ?? "-"}%</span></div>}
+                    {(state.current.progress_ms ?? 0) >= 0 && (state.current.duration_ms ?? 0) > 0 && <div aria-label="Track progress" className={`mt-2 h-1 overflow-hidden rounded-full bg-white/20 ${hero ? "mx-auto w-[85%] max-w-64" : "w-full"}`}><div className="h-full rounded-full bg-white/90 transition-[width]" style={{ width: `${Math.max(0, Math.min(100, ((state.current.progress_ms ?? 0) / (state.current.duration_ms || 1)) * 100))}%` }} /></div>}
                 </div>
             </div>
             </div>
@@ -232,8 +316,13 @@ function SpotifySurface({ fullPage = false, hero = false, wide = false }: { full
                 <Button variant="ghost" size="sm" className="mb-3" onClick={() => setSelectedCluster(null)}><ArrowLeft />All clusters</Button>
                 <div className="mb-3"><h2 className="text-lg font-semibold">{selectedCluster.cluster.name}</h2><p className="text-sm text-muted-foreground">{selectedCluster.albums.length} albums</p></div>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    {selectedCluster.albums.map((album) => <button key={album.id} type="button" disabled={busy} onClick={() => void playAlbum(album)} className="group min-w-0 text-left">
+                    {selectedCluster.albums.map((album) => <button key={album.id} type="button" disabled={busy} onClick={() => void openAlbum(album)} className="group relative min-w-0 text-left">
                         {album.cover_image ? <img src={album.cover_image} alt={`${album.name} album art`} className="aspect-square w-full rounded-md object-cover shadow-sm transition group-hover:brightness-75" /> : <div className="flex aspect-square items-center justify-center rounded-md bg-muted"><Album className="size-8 text-muted-foreground" /></div>}
+                        <div className="absolute left-2 top-2 flex gap-2 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100">
+                            <span role="button" tabIndex={0} onClick={(event) => { event.stopPropagation(); void playAlbum(album); }} onKeyDown={(event) => { if (event.key === "Enter") void playAlbum(album); }} className="flex size-9 items-center justify-center rounded-full bg-black/75 text-white shadow-lg backdrop-blur">
+                                {playingAlbumId === album.id ? <LoaderCircle className="size-4 animate-spin" /> : <Play className="size-4 fill-current" />}
+                            </span>
+                        </div>
                         <p className="mt-2 truncate text-sm font-medium">{album.name}</p><p className="truncate text-xs text-muted-foreground">{album.artist}</p>
                     </button>)}
                 </div>
@@ -259,5 +348,39 @@ function SpotifySurface({ fullPage = false, hero = false, wide = false }: { full
             </>}
         </section>}
         {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+        {selectedAlbum && <Dialog open={albumDialogOpen} onOpenChange={setAlbumDialogOpen}>
+            <DialogContent className="max-w-2xl p-6">
+                <DialogHeader>
+                    <DialogTitle className="text-lg font-semibold">{selectedAlbum.name}</DialogTitle>
+                    <DialogDescription className="mt-1 text-sm text-muted-foreground">{selectedAlbum.artist}</DialogDescription>
+                </DialogHeader>
+                <div className="mt-4">
+                    {selectedAlbum.cover_image && <img src={selectedAlbum.cover_image} alt={`${selectedAlbum.name} album art`} className="mb-4 aspect-square w-full rounded-md object-cover" />}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col">
+                            <span className="text-sm text-muted-foreground">Release date</span>
+                            <span className="mt-1 text-sm font-medium">{selectedAlbum.release_date ?? "Unknown"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-sm text-muted-foreground">Label</span>
+                            <span className="mt-1 text-sm font-medium">{selectedAlbum.label ?? "Unknown"}</span>
+                        </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <Button variant="default" size="sm" onClick={() => void playAlbum({ id: selectedAlbum.id, name: selectedAlbum.name, artist: selectedAlbum.artist, cover_image: selectedAlbum.cover_image, release_date: selectedAlbum.release_date })}>
+                            {playingAlbumId === selectedAlbum.id ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4 fill-current" />}Play album
+                        </Button>
+                        {devices.length > 0 && <select aria-label="Playback device" className="h-8 rounded-md border border-border bg-background px-2 text-xs" defaultValue={devices.find((device) => device.is_active)?.id || devices[0]?.id} onChange={(event) => void transferPlayback(event.target.value)}>{devices.map((device) => <option key={device.id} value={device.id}>{device.name}</option>)}</select>}
+                    </div>
+                    {selectedAlbum.tracks.length > 0 && <div className="mt-5 max-h-64 space-y-1 overflow-y-auto">
+                        {selectedAlbum.tracks.map((track) => <button key={track.id ?? track.track_number} type="button" disabled={busy || !track.id} onClick={() => track.id && void playTrack(track.id)} className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-muted">
+                            <span className="w-5 text-right text-xs text-muted-foreground">{track.track_number}</span>
+                            <span className="min-w-0 flex-1 truncate text-sm">{track.name}{track.explicit && <span className="ml-2 text-[10px] text-muted-foreground">E</span>}</span>
+                            <span className="text-xs text-muted-foreground">{Math.floor(track.duration_ms / 60000)}:{String(Math.floor((track.duration_ms % 60000) / 1000)).padStart(2, "0")}</span>
+                        </button>)}
+                    </div>}
+                </div>
+            </DialogContent>
+        </Dialog>}
     </div></main>;
 }

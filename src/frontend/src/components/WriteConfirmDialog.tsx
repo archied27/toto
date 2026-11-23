@@ -1,12 +1,15 @@
 import { Button } from "./ui/button";
-import { Card } from "./ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 import { CheckIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 
 /**
- * Simple confirmation dialog shown when the LLM wants to execute a write
- * action (e.g. adding a task).  Displays a title and the parsed arguments,
- * with Confirm / Cancel buttons.  The dialog is intentionally light so it
- * can overlay the still-streaming answer behind it.
+ * Confirmation dialog shown when the LLM wants to execute a write action.
  */
 export default function WriteConfirmDialog({
   title,
@@ -25,14 +28,15 @@ export default function WriteConfirmDialog({
   );
 
   return (
-    <Card className="gap-4 rounded-xl border border-border bg-card p-4 text-card-foreground shadow-lg">
-      <div className="flex items-start gap-3">
-        <TriangleAlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
-        <div className="min-w-0">
-          <p className="text-sm font-semibold">Confirm action</p>
-          <p className="mt-1 text-sm text-muted-foreground">{title}</p>
-        </div>
-      </div>
+    <Dialog open onOpenChange={(open) => !open && onCancel()}>
+      <DialogContent className="gap-5">
+        <DialogHeader className="pr-8">
+          <DialogTitle className="flex items-center gap-2">
+            <TriangleAlertIcon className="h-5 w-5 shrink-0 text-amber-500" />
+            Confirm action
+          </DialogTitle>
+          <DialogDescription>{title}</DialogDescription>
+        </DialogHeader>
 
       {entries.length > 0 && (
         <ul className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs">
@@ -58,6 +62,7 @@ export default function WriteConfirmDialog({
           Run action
         </Button>
       </div>
-    </Card>
+      </DialogContent>
+    </Dialog>
   );
 }

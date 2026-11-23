@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/hooks/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Monitor, Pause, Play } from "lucide-react";
+import { FastForward, Maximize, Monitor, Pause, Play, Rewind, SkipForward } from "lucide-react";
 
 interface PlayingState {
   status: "playing" | "paused";
@@ -92,6 +92,41 @@ export function CurrentlyPlayingCompanion() {
     }
   };
 
+  const sendControl = async (action: string, payload: Record<string, number> = {}) => {
+    if (!playing) return;
+    setControlling(true);
+    setControlError(null);
+    try {
+      const response = await apiFetch<{ status: string; message?: string }>(
+        `/media/${encodeURIComponent(playing.agent_id)}/${action}`,
+        { method: "POST", body: JSON.stringify(payload) },
+      );
+      if (response.status !== "success") throw new Error(response.message || "Playback control failed");
+    } catch (error) {
+      setControlError(error instanceof Error ? error.message : "Playback control failed");
+    } finally {
+      setControlling(false);
+    }
+  };
+
+  const playNextEpisode = async () => {
+    const currentPlaying = playing;
+    if (!currentPlaying || currentPlaying.media_type !== "series" || currentPlaying.season_number == null || currentPlaying.episode_number == null) return;
+    setControlling(true);
+    setControlError(null);
+    try {
+      const response = await apiFetch<{ status: string; message?: string }>("/media/stream", {
+        method: "POST",
+        body: JSON.stringify({ media_type: "series", tmdb_id: currentPlaying.tmdb_id, season_number: currentPlaying.season_number, episode_number: currentPlaying.episode_number + 1, agent_id: currentPlaying.agent_id }),
+      });
+      if (response.status !== "success") throw new Error(response.message || "Could not open the next episode");
+    } catch (error) {
+      setControlError(error instanceof Error ? error.message : "Could not open the next episode");
+    } finally {
+      setControlling(false);
+    }
+  };
+
   if (loading) {
     return (
       <Card className="flex items-center justify-center h-full bg-card/50">
@@ -162,52 +197,13 @@ export function CurrentlyPlayingCompanion() {
               <span className="truncate">{playing.agent_name}</span>
             </div>
 
-            {hasProgress && (
-              <div className="mt-2 flex items-center gap-2">
-                <input
-                  type="range"
-                  min="0"
-                  max={playing.duration_seconds ?? 100}
-                  value={playing.position_seconds ?? 0}
-                  step="1"
-                  onChange={(e) => {
-                    const position = parseInt(e.target.value);
-                    // Dispatch seek to the agent
-                    apiFetch<{ status: string }>(
-                      `/media/${encodeURIComponent(playing.agent_id)}/seek`,
-                      {
-                        method: "POST",
-                        body: JSON.stringify({ position_seconds: position }),
-                      }
-                    )
-                    .then((response) => {
-                      if (response.status !== "success") {
-                        console.error("Seek failed:", response);
-                      }
-                    })
-                    .catch((error) => {
-                      console.error("Seek error:", error);
-                    });
-                  }}
-                  className="flex-1"
-                />
-                <span className="text-xs text-muted-foreground/70">
-                  {formatTime(playing.position_seconds ?? 0)} / {formatTime(playing.duration_seconds ?? 0)}
-                </span>
-              </div>
-            )}
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              aria-label={playing.status === "playing" ? "Pause" : "Play"}
-              title={playing.status === "playing" ? "Pause" : "Play"}
-              disabled={controlling}
-              className="mt-6 self-start hover:bg-primary/10 hover:text-primary"
-              onClick={togglePlayback}
-            >
-              {playing.status === "playing" ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-            </Button>
+            <div className="mt-6 flex flex-wrap gap-1">
+              <Button type="button" variant="outline" size="icon" aria-label="Seek backward 5 seconds" title="Seek backward 5 seconds" disabled={controlling} onClick={() => sendControl("seek_by", { delta_seconds: -5 })}><Rewind className="h-4 w-4" /></Button>
+              <Button type="button" variant="outline" size="icon" aria-label={playing.status === "playing" ? "Pause" : "Play"} title={playing.status === "playing" ? "Pause" : "Play"} disabled={controlling} onClick={togglePlayback}>{playing.status === "playing" ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}</Button>
+              <Button type="button" variant="outline" size="icon" aria-label="Seek forward 5 seconds" title="Seek forward 5 seconds" disabled={controlling} onClick={() => sendControl("seek_by", { delta_seconds: 5 })}><FastForward className="h-4 w-4" /></Button>
+              <Button type="button" variant="outline" size="icon" aria-label="Fullscreen" title="Fullscreen" disabled={controlling} onClick={() => sendControl("fullscreen")}><Maximize className="h-4 w-4" /></Button>
+              {playing.media_type === "series" && <Button type="button" variant="outline" size="icon" aria-label="Next episode" title="Next episode" disabled={controlling} onClick={playNextEpisode}><SkipForward className="h-4 w-4" /></Button>}
+            </div>
           </div>
         </div>
         {hasProgress && (

@@ -4,6 +4,7 @@ from typing import Any
 
 import numpy as np
 from hdbscan import HDBSCAN, membership_vector
+from sklearn.cluster import KMeans
 from sklearn.preprocessing import MultiLabelBinarizer, StandardScaler
 
 
@@ -26,7 +27,7 @@ def cluster_albums(albums: list[dict[str, Any]]) -> dict[str, int]:
     genres = MultiLabelBinarizer()
     genre_matrix = genres.fit_transform([album.get("genres", []) for album in albums])
     numeric = np.array([
-        [album.get("popularity", 0), _year(album.get("release_date")), album.get("avg_duration", 0)]
+        [_year(album.get("release_date")), album.get("avg_duration", 0)]
         for album in albums
     ], dtype=float)
     features = np.concatenate([StandardScaler().fit_transform(numeric), genre_matrix], axis=1)
@@ -49,7 +50,35 @@ def cluster_albums(albums: list[dict[str, Any]]) -> dict[str, int]:
             noise_indices = np.where(noise)[0]
             labels[noise_indices[probability >= 0.035]] = best[probability >= 0.035]
 
+    labels = _split_oversized_clusters(labels, features, albums)
+
     return {album["id"]: int(label) for album, label in zip(albums, labels)}
+
+
+def _split_oversized_clusters(labels: np.ndarray, features: np.ndarray, albums: list[dict[str, Any]]) -> np.ndarray:
+    if len(labels) == 0:
+        return labels
+
+    max_cluster_size = max(25, int(len(labels) * 0.12))
+    unique_labels = [label for label in np.unique(labels) if label != -1]
+    next_label = max([int(label) for label in unique_labels] + [-1]) + 1
+
+    for cluster_id in unique_labels:
+        indices = np.where(labels == cluster_id)[0]
+        if len(indices) <= max_cluster_size:
+            continue
+
+        split_count = max(2, int(np.ceil(len(indices) / max_cluster_size)))
+        split_count = min(split_count, len(indices))
+        sub_labels = KMeans(n_clusters=split_count, random_state=42, n_init=10).fit_predict(features[indices])
+
+        for sub_index, sub_label in enumerate(sub_labels):
+            if sub_label == 0:
+                continue
+            labels[indices[sub_index]] = next_label + int(sub_label) - 1
+        next_label += split_count - 1
+
+    return labels
 
 
 def grouped_albums(albums: list[dict[str, Any]], names: dict[int, str] | None = None) -> list[dict[str, Any]]:

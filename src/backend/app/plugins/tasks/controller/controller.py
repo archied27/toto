@@ -61,7 +61,7 @@ class TasksController:
         # Check if any task is currently being worked on (timer active)
         all_tasks = await self.db_controller.get_all_tasks()
         if any(task.is_working or task.is_paused for task in all_tasks):
-            return 95
+            return 99
 
         overdue_tasks = await self.db_controller.get_overdue_tasks()
         tasks_due_today = await self.db_controller.get_today_due_tasks()
@@ -70,7 +70,7 @@ class TasksController:
         priority += len(overdue_tasks) * 45
         priority += len([task for task in tasks_due_today if not task.completed]) * 35
         priority += len([task for task in tasks_set_today if not task.completed]) * 35
-        return min(priority, 100)
+        return min(priority, 90)
 
     async def add_task(self, task: CreateTask):
         # add a task to the database
@@ -212,3 +212,6 @@ class TasksController:
 
     async def get_label_by_name(self, name: str) -> Optional[Label]:
         return await self.db_controller.get_label_by_name(name)
+
+    async def get_focus_stats(self, days: int = 7):
+        return await self.db_controller.get_focus_stats(days)

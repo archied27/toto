@@ -10,6 +10,7 @@ import TaskFilter from "./components/TaskFilter";
 import ActiveFilters from "./components/ActiveFilters";
 import { useNavigation } from "@/hooks/NavigationContext";
 import { PomodoroTimer } from "./TasksWidgets";
+import FocusStatsSection from "./components/FocusStatsSection";
 
 // Orders tasks by the date they should be worked on: to_do_date first, falling
 // back to due_date when there's no to-do date. Undated tasks go last.
@@ -37,7 +38,7 @@ export default function TasksPage() {
     const { taskLabels } = useGetTaskLabels();
     const { taskLists } = useGetTaskLists();
 
-    const [currentTab, setCurrentTab] = useState<"Today" | "Tomorrow" | "Upcoming" | "All">("All");
+    const [currentTab, setCurrentTab] = useState<"Today" | "Tomorrow" | "Upcoming" | "All" | "Stats">("All");
 
     const [currentTasks, setCurrentTasks] = useState<Task[]>(taskState?.today_tasks || []);
     const [currentRefresh, setCurrentRefresh] = useState<() => void>(() => () => {});
@@ -181,10 +182,12 @@ export default function TasksPage() {
                     setCurrentRefresh(() => getAllTasks);
                 }
                 break;
+            case "Stats":
+                break;
         }
     }, [taskState, tomorrowTasks, upcomingTasks, allTasks, labelFilteredTasks, listFilteredTasks, selectedLabelId, selectedListId, currentTab]);
 
-    const handleTabChange = (tab: "Today" | "Tomorrow" | "Upcoming" | "All") => {
+    const handleTabChange = (tab: "Today" | "Tomorrow" | "Upcoming" | "All" | "Stats") => {
         setCurrentTab(tab);
         if (tab === "Tomorrow") getTomorrowTasks();
         if (tab === "Upcoming") getUpcomingTasks();
@@ -216,7 +219,7 @@ export default function TasksPage() {
 
                 <div className={`${addTaskPageOpen ? "opacity-50 blur pointer-events-none" : ""} gap-5 pt-5 flex flex-col flex-1 transition-opacity`}>
                     <Hero selected={currentTab} total={dedupedTasks.length} completed={completedTasks.length} handleAddTask={() => setAddTaskPageOpen(true)} />
-                    {focusedTask && (
+                    {focusedTask && currentTab !== "Stats" && (
                         <section className="overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-card shadow-sm">
                             <div className="p-4 sm:p-5">
                                 <PomodoroTimer
@@ -229,8 +232,9 @@ export default function TasksPage() {
                         </section>
                     )}
                     <TaskTabs currentTab={currentTab} onTabChange={handleTabChange} />
+                    {currentTab === "Stats" && <FocusStatsSection />}
 
-                    {filtersActive && (
+                    {currentTab !== "Stats" && filtersActive && (
                         <div className="flex items-center gap-2">
                             <TaskFilter
                                 labels={taskLabels}
@@ -249,7 +253,7 @@ export default function TasksPage() {
                         </div>
                     )}
 
-                    {overdueTasks.length > 0 && (
+                    {currentTab !== "Stats" && overdueTasks.length > 0 && (
                         <div className="flex flex-col gap-2">
                             <div className="flex items-center justify-between">
                                 <h2 className="text-lg font-semibold text-red-500">Overdue Tasks</h2>
@@ -269,7 +273,7 @@ export default function TasksPage() {
                             ))}
                         </div>
                     )}
-                    {incompleteTasks.length > 0 && (
+                    {currentTab !== "Stats" && incompleteTasks.length > 0 && (
                         <div className="flex flex-col gap-2">
                             {overdueTasks.length === 0 && (
                                 <div className="flex items-center justify-between">
@@ -292,11 +296,10 @@ export default function TasksPage() {
                             ))}
                         </div>
                     )}
-                    {completedTasks.length > 0  && (
+                    {currentTab !== "Stats" && completedTasks.length > 0  && (
                         <TaskList tasks={completedTasks} refresh={currentRefresh} title="Completed Tasks" titleClassName="text-muted-foreground" cardClassName="opacity-50" onSweepingChange={handleSweepingChange} entering={entering} leaving={leaving} />
                     )}
-
-                    {dedupedTasks.length === 0 && (
+                    {currentTab !== "Stats" && dedupedTasks.length === 0 && (
                         <div className="flex flex-1 items-center justify-center">
                             <p className="text-sm text-muted-foreground">
                                 {selectedLabelId !== null || selectedListId !== null

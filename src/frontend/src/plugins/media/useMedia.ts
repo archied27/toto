@@ -56,6 +56,7 @@ export interface EpisodeDetails {
     duration_seconds: number;
     position_seconds?: number;
     completed?: number;
+    last_watched?: string;
 }
 
 export interface SeasonDetails {

@@ -568,3 +568,123 @@ class TasksDBController:
         if not row:
             return None
         return Label(id=row["id"], name=row["name"], colour=row["colour"])
+
+    async def get_focus_stats(self, days: int = 7) -> dict:
+        from datetime import datetime, timedelta, timezone
+
+        days = max(1, min(int(days), 365))
+        now = datetime.now(timezone.utc)
+        today = now.date()
+        cutoff = datetime.combine(today - timedelta(days=days - 1), datetime.min.time(), tzinfo=timezone.utc)
+
+        rows = await self.core.db_manager.fetch_all(
+            """
+            SELECT ws.task_id, ws.started_at, ws.ended_at, ws.duration_seconds,
+                   t.title
+            FROM tasks_work_sessions ws
+            JOIN tasks_tasks t ON t.id = ws.task_id
+            WHERE ws.ended_at >= ?
+            ORDER BY ws.started_at ASC
+            """,
+            (cutoff.isoformat(),),
+        )
+
+        daily_seconds = { (today - timedelta(days=offset)).isoformat(): 0 for offset in range(days - 1, -1, -1) }
+        daily_sessions = { date: 0 for date in daily_seconds }
+        label_totals: dict[int, dict] = {}
+        task_totals: dict[int, dict] = {}
+        recorded_seconds = 0
+        session_count = 0
+
+        for row in rows:
+            duration = max(0, int(row["duration_seconds"] or 0))
+            if duration == 0:
+                continue
+            try:
+                ended = datetime.fromisoformat(row["ended_at"])
+                date_key = ended.date().isoformat()
+            except (TypeError, ValueError):
+                continue
+            if date_key not in daily_seconds:
+                continue
+
+            recorded_seconds += duration
+            session_count += 1
+            daily_seconds[date_key] += duration
+            daily_sessions[date_key] += 1
+
+            task_id = int(row["task_id"])
+            task_totals.setdefault(task_id, {"task_id": task_id, "title": row["title"], "seconds": 0, "sessions": 0})
+            task_totals[task_id]["seconds"] += duration
+            task_totals[task_id]["sessions"] += 1
+
+            for label in await self._fetch_labels_for_task(task_id):
+                label_totals.setdefault(label.id, {"id": label.id, "name": label.name, "colour": label.colour, "seconds": 0, "sessions": 0})
+                label_totals[label.id]["seconds"] += duration
+                label_totals[label.id]["sessions"] += 1
+
+        active_rows = await self.core.db_manager.fetch_all(
+            "SELECT id, session_elapsed, work_session_start, is_working, is_paused FROM tasks_tasks"
+        )
+        active_seconds = 0
+        for row in active_rows:
+            active = int(row["session_elapsed"] or 0)
+            if row["is_working"] and row["work_session_start"]:
+                try:
+                    start = datetime.fromisoformat(row["work_session_start"])
+                    active += max(0, int((now - start).total_seconds()))
+                except (TypeError, ValueError):
+                    pass
+            active_seconds += active
+
+        week_start = today - timedelta(days=today.weekday())
+        week_rows = await self.core.db_manager.fetch_all(
+            """
+            SELECT duration_seconds, ended_at
+            FROM tasks_work_sessions
+            WHERE ended_at >= ?
+            """,
+            (datetime.combine(week_start, datetime.min.time(), tzinfo=timezone.utc).isoformat(),),
+        )
+        this_week_seconds = sum(max(0, int(row["duration_seconds"] or 0)) for row in week_rows)
+
+        longest_streak = 0
+        running_streak = 0
+        for date_key in daily_seconds:
+            if daily_seconds[date_key] > 0:
+                running_streak += 1
+                longest_streak = max(longest_streak, running_streak)
+            else:
+                running_streak = 0
+
+        current_streak = 0
+        for offset in range(days):
+            date_key = (today - timedelta(days=offset)).isoformat()
+            if daily_seconds.get(date_key, 0) > 0:
+                current_streak += 1
+            else:
+                break
+
+        best_date = max(daily_seconds, key=daily_seconds.get) if daily_seconds else None
+        best_seconds = daily_seconds.get(best_date, 0) if best_date else 0
+
+        return {
+            "days": days,
+            "total_seconds": recorded_seconds + active_seconds,
+            "recorded_seconds": recorded_seconds,
+            "active_seconds": active_seconds,
+            "this_week_seconds": this_week_seconds,
+            "session_count": session_count,
+            "focus_days": sum(1 for seconds in daily_seconds.values() if seconds > 0),
+            "average_session_seconds": int(recorded_seconds / session_count) if session_count else 0,
+            "longest_streak": longest_streak,
+            "current_streak": current_streak,
+            "best_day": best_date if best_seconds > 0 else None,
+            "best_day_seconds": best_seconds,
+            "daily": [
+                {"date": date_key, "seconds": seconds, "sessions": daily_sessions[date_key]}
+                for date_key, seconds in daily_seconds.items()
+            ],
+            "labels": sorted(label_totals.values(), key=lambda item: item["seconds"], reverse=True),
+            "tasks": sorted(task_totals.values(), key=lambda item: item["seconds"], reverse=True)[:10],
+        }

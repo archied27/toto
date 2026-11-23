@@ -13,7 +13,7 @@ class SpotifyNotConfigured(Exception):
 
 class SpotifyClient:
     authorization_scopes = (
-        "user-read-currently-playing user-read-playback-state user-modify-playback-state user-library-read"
+        "user-read-currently-playing user-read-playback-state user-read-recently-played user-modify-playback-state user-library-read playlist-read-private playlist-read-collaborative"
     )
 
     def __init__(self, db):
@@ -102,11 +102,164 @@ class SpotifyClient:
                 return albums
             offset += len(page.get("items", []))
 
+    async def playlists(self) -> list[dict[str, Any]]:
+        playlists = []
+        offset = 0
+        while True:
+            page = await self.request("GET", "/me/playlists", params={"limit": 50, "offset": offset})
+            playlists.extend(page.get("items", []))
+            if not page.get("next"):
+                return playlists
+            offset += len(page.get("items", []))
+
+    async def recently_played_playlist_ids(self) -> list[str]:
+        payload = await self.request("GET", "/me/player/recently-played", params={"limit": 50})
+        playlist_ids = []
+        for item in payload.get("items", []):
+            context_uri = (item.get("context") or {}).get("uri", "")
+            if context_uri.startswith("spotify:playlist:"):
+                playlist_id = context_uri.rsplit(":", 1)[-1]
+                if playlist_id and playlist_id not in playlist_ids:
+                    playlist_ids.append(playlist_id)
+        return playlist_ids
+
+    async def search(self, query: str) -> dict[str, list[dict[str, Any]]]:
+        payload = await self.request(
+            "GET",
+            "/search",
+            params={"q": query, "type": "track,album,playlist,artist", "limit": 8},
+        )
+        return {
+            "tracks": payload.get("tracks", {}).get("items", []),
+            "albums": payload.get("albums", {}).get("items", []),
+            "playlists": payload.get("playlists", {}).get("items", []),
+            "artists": payload.get("artists", {}).get("items", []),
+        }
+
+    async def queue(self) -> list[dict[str, Any]]:
+        payload = await self.request("GET", "/me/player/queue")
+        return payload.get("queue", [])
+
     async def artist(self, artist_id: str) -> dict[str, Any]:
         return await self.request("GET", f"/artists/{artist_id}")
 
-    async def play_album(self, album_id: str) -> None:
-        await self.request("PUT", "/me/player/play", json={"context_uri": f"spotify:album:{album_id}"})
+    async def devices(self) -> list[dict[str, Any]]:
+        payload = await self.request("GET", "/me/player/devices")
+        devices = payload.get("devices", [])
+        return [
+            {
+                "id": device.get("id"),
+                "name": device.get("name"),
+                "type": device.get("type"),
+                "is_active": bool(device.get("is_active")),
+                "is_restricted": bool(device.get("is_restricted")),
+                "volume_percent": device.get("volume_percent"),
+            }
+            for device in devices
+            if device.get("id")
+        ]
+
+    async def transfer_playback(self, device_id: str, play: bool = True) -> None:
+        await self.request("PUT", "/me/player", json={"device_ids": [device_id], "play": play})
+
+    async def preferred_phone_device(self) -> dict[str, Any] | None:
+        devices = await self.devices()
+        for device in devices:
+            if str(device.get("type", "")).lower() in {"smartphone", "phone"}:
+                return device
+        for device in devices:
+            if device["is_active"]:
+                return device
+        return devices[0] if devices else None
+
+    async def play_album(self, album_id: str, device_id: str | None = None) -> None:
+        devices = await self.devices()
+        target = next((device for device in devices if device["id"] == device_id), None) if device_id else None
+        if not target:
+            target = await self.preferred_phone_device()
+        params = {"device_id": target["id"]} if target else None
+        await self.request(
+            "PUT",
+            "/me/player/play",
+            params=params,
+            json={"context_uri": f"spotify:album:{album_id}"},
+        )
+
+    async def play_playlist(self, playlist_id: str, device_id: str | None = None) -> None:
+        target = None
+        if device_id:
+            devices = await self.devices()
+            target = next((device for device in devices if device["id"] == device_id), None)
+        if not target:
+            target = await self.preferred_phone_device()
+        params = {"device_id": target["id"]} if target else None
+        await self.request("PUT", "/me/player/play", params=params, json={"context_uri": f"spotify:playlist:{playlist_id}"})
+
+    async def album(self, album_id: str) -> dict[str, Any]:
+        payload = await self.request("GET", f"/albums/{album_id}")
+        genres = set()
+        for artist in payload.get("artists", []):
+            artist_id = artist.get("id")
+            if artist_id:
+                try:
+                    genres.update((await self.artist(artist_id)).get("genres", []))
+                except ValueError:
+                    pass
+        return {
+            "id": payload.get("id"),
+            "name": payload.get("name", "Unknown album"),
+            "artist": ", ".join(artist.get("name", "") for artist in payload.get("artists", [])),
+            "release_date": payload.get("release_date"),
+            "label": payload.get("label"),
+            "popularity": payload.get("popularity", 0),
+            "genres": sorted(genres),
+            "tracks": [
+                {
+                    "id": track.get("id"),
+                    "name": track.get("name"),
+                    "duration_ms": track.get("duration_ms", 0),
+                    "track_number": track.get("track_number"),
+                    "explicit": bool(track.get("explicit")),
+                }
+                for track in payload.get("tracks", {}).get("items", [])
+            ],
+            "cover_image": (payload.get("images") or [{}])[0].get("url"),
+        }
+
+    async def playlist(self, playlist_id: str) -> dict[str, Any]:
+        payload = await self.request("GET", f"/playlists/{playlist_id}")
+        owner = payload.get("owner") or {}
+        return {
+            "id": payload.get("id"),
+            "name": payload.get("name", "Untitled playlist"),
+            "artist": owner.get("display_name") or owner.get("id", ""),
+            "cover_image": (payload.get("images") or [{}])[0].get("url"),
+            "description": payload.get("description"),
+            "tracks": [
+                {
+                    "id": (item.get("track") or {}).get("id"),
+                    "name": (item.get("track") or {}).get("name", "Unknown track"),
+                    "duration_ms": (item.get("track") or {}).get("duration_ms", 0),
+                    "artist": ", ".join(
+                        artist.get("name", "")
+                        for artist in (item.get("track") or {}).get("artists", [])
+                    ),
+                    "album": ((item.get("track") or {}).get("album") or {}).get("name", ""),
+                }
+                for item in (payload.get("tracks") or {}).get("items", [])
+                if isinstance(item, dict) and isinstance(item.get("track"), dict) and (item.get("track") or {}).get("id")
+            ],
+        }
+
+    async def play_track(self, track_id: str, device_id: str | None = None) -> None:
+        target = None
+        if device_id:
+            devices = await self.devices()
+            target = next((device for device in devices if device["id"] == device_id), None)
+        if not target:
+            target = await self.preferred_phone_device()
+        params = {"device_id": target["id"]} if target else None
+        await self.request("PUT", "/me/player/play", params=params, json={"uris": [f"spotify:track:{track_id}"]})
 
     async def control(self, action: str) -> None:
         methods = {
@@ -119,3 +272,17 @@ class SpotifyClient:
             raise ValueError(f"Unsupported Spotify action: {action}")
         method, path = methods[action]
         await self.request(method, path)
+
+    async def seek(self, position_ms: int) -> None:
+        await self.request("PUT", "/me/player/seek", params={"position_ms": max(0, position_ms)})
+
+    async def set_volume(self, volume_percent: int) -> None:
+        await self.request("PUT", "/me/player/volume", params={"volume_percent": max(0, min(100, volume_percent))})
+
+    async def set_shuffle(self, state: bool) -> None:
+        await self.request("PUT", "/me/player/shuffle", params={"state": str(state).lower()})
+
+    async def set_repeat(self, state: str) -> None:
+        if state not in {"off", "track", "context"}:
+            raise ValueError("Repeat must be off, track, or context")
+        await self.request("PUT", "/me/player/repeat", params={"state": state})

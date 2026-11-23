@@ -100,6 +100,24 @@ class CompletedTasksOnDateSlots(BaseModel):
         )
     )
 
+class RescheduleTaskSlots(BaseModel):
+    task_name: str = Field(
+        description="The task name or a short name/abbreviation for it, e.g. 'DMS Coursework'."
+    )
+    date: str = Field(
+        description=(
+            "The new date copied verbatim in natural language (e.g. 'tomorrow', "
+            "'Friday', 'August 14'). Do not convert it to an ISO date or weekday number."
+        )
+    )
+    date_type: Literal["todo", "due"] = Field(
+        default="todo",
+        description=(
+            "Set to 'due' only when the user says due date, deadline, or due; "
+            "otherwise set to 'todo' for move/schedule/reschedule/to-do phrases."
+        ),
+    )
+
 class TasksCommand(BaseCommand):
     def __init__(self, controller: TasksController):
         self.controller = controller
@@ -300,6 +318,26 @@ class TasksCommand(BaseCommand):
                 type="nav",
                 examples=["add task", "new task", "create task", "add a new task", "create a new task"],
             ),
+            IntentSpec(
+                name="reschedule_task",
+                command_name="Reschedule A Task",
+                description="change the to-do/scheduled date or due date of an existing task",
+                type="write",
+                examples=[
+                    "move dms cw to tomorrow",
+                    "reschedule maths coursework to friday",
+                    "move essay to monday",
+                    "change the due date for ai coursework to next friday",
+                    "set the deadline for dissertation to august 20",
+                    "schedule call dentist for thursday",
+                ],
+                slots=RescheduleTaskSlots,
+                slot_examples=[
+                    ("move dms cw to tomorrow", {"task_name": "DMS CW", "date": "tomorrow", "date_type": "todo"}),
+                    ("change the due date for ai coursework to friday", {"task_name": "AI Coursework", "date": "Friday", "date_type": "due"}),
+                ],
+                loading_msg="Rescheduling Task",
+            ),
         ]
 
     async def handle(self, intent: str, extracted: dict, raw: str) -> CommandResult:
@@ -455,3 +493,77 @@ class TasksCommand(BaseCommand):
 
             await self.controller.set_pomodoro_goal(str(matched_task.id), goal_seconds)
             return CommandResult(True, "set_pomodoro_goal", f"Set pomodoro goal for '{matched_task.title}' to {goal_minutes} minutes", {"task_id": matched_task.id, "goal_minutes": goal_minutes})
+
+        if intent == "reschedule_task":
+            task_name = (extracted.get("task_name") or "").strip()
+            date_phrase = (extracted.get("date") or "").strip()
+
+            if not task_name:
+                return CommandResult(False, "reschedule_task", "Could not understand which task to reschedule", {})
+            if not date_phrase:
+                return CommandResult(False, "reschedule_task", "Could not understand the new date", {})
+
+            iso_date = parse_date(date_phrase)
+            if not iso_date:
+                return CommandResult(False, "reschedule_task", f"Couldn't understand the date '{date_phrase}'", {})
+
+            tasks = await self.controller.get_all_tasks()
+            query = task_name.lower()
+
+            def title_key(title: str) -> str:
+                return " ".join(title.lower().replace("_", " ").replace("-", " ").split())
+
+            matched_task = None
+            query_key = title_key(task_name)
+
+            for task in tasks:
+                if title_key(task.title) == query_key:
+                    matched_task = task
+                    break
+
+            if not matched_task:
+                for task in tasks:
+                    task_key = title_key(task.title)
+                    if query_key in task_key or task_key in query_key:
+                        matched_task = task
+                        break
+
+            if not matched_task:
+                from difflib import SequenceMatcher
+
+                best_task = None
+                best_score = 0.0
+                for task in tasks:
+                    score = SequenceMatcher(None, query_key, title_key(task.title)).ratio()
+                    if score > best_score:
+                        best_task = task
+                        best_score = score
+                if best_score >= 0.55:
+                    matched_task = best_task
+
+            if not matched_task:
+                return CommandResult(False, "reschedule_task", f"No task found with name '{task_name}'", {})
+
+            date_type = extracted.get("date_type", "todo")
+            if date_type not in ("todo", "due"):
+                date_type = "todo"
+
+            updated = CreateTask(
+                title=matched_task.title,
+                description=matched_task.description,
+                due_date=iso_date if date_type == "due" else matched_task.due_date,
+                to_do_date=iso_date if date_type == "todo" else matched_task.to_do_date,
+                label_ids=[label.id for label in matched_task.labels],
+                list_id=matched_task.task_list.id if matched_task.task_list else None,
+            )
+            await self.controller.update_task(updated, matched_task.id)
+
+            date_label = "due date" if date_type == "due" else "to-do date"
+            return CommandResult(
+                True,
+                "reschedule_task",
+                f"Moved '{matched_task.title}' to {iso_date} ({date_label})",
+                {"task_id": matched_task.id, "date": iso_date, "date_type": date_type, "task": await self.controller.get_task(str(matched_task.id))},
+            )
+
+        return CommandResult(False, "unknown_intent", "Intent not recognized", {})

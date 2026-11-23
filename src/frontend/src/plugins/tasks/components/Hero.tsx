@@ -1,7 +1,7 @@
 import AddTaskButton from "./AddTaskButton"
 
 interface HeroProps {
-  selected: "Today" | "Tomorrow" | "Upcoming" | "All"
+  selected: "Today" | "Tomorrow" | "Upcoming" | "All" | "Stats"
   total: number | null // total number of tasks
   completed: number | null  // completed number of tasks
   handleAddTask?: () => void
@@ -12,7 +12,8 @@ export default function Hero({ selected, total, completed, handleAddTask }: Hero
     "Today": "Today",
     "Tomorrow": "Tomorrow",
     "Upcoming": "Upcoming Tasks",
-    "All": "All Tasks"
+    "All": "All Tasks",
+    "Stats": "Task Statistics"
   }
 
   const progressString = (completed !== null && total !== null) 

@@ -159,7 +159,7 @@ export function PomodoroTimer({ tasks, initialTaskId, onStop, fillHeight = false
     useEffect(() => {
         if (phase !== "break" || !breakEndsAt || now < breakEndsAt || !selectedTask || transitionInProgress.current) return;
         transitionInProgress.current = true;
-        void startWork(selectedTask.id).finally(() => {
+        void startWork(selectedTask.id, true).finally(() => {
             setBreakEndsAt(null);
             setPhase("focus");
             transitionInProgress.current = false;
@@ -197,7 +197,7 @@ export function PomodoroTimer({ tasks, initialTaskId, onStop, fillHeight = false
         if (timerBusy) return;
         if (phase !== "break") return;
         transitionInProgress.current = true;
-        await startWork(selectedTask.id);
+        await startWork(selectedTask.id, true);
         setBreakEndsAt(null);
         setPhase("focus");
         transitionInProgress.current = false;

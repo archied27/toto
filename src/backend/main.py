@@ -130,7 +130,10 @@ async def stream_command(req: dict):
     """
     mode = req.get("mode", "normal")
     async def event_source():
-        async for event in CommandRouter.process_stream(req["input"], mode=mode):
+        history = req.get("history", []) if mode == "llm" else []
+        async for event in CommandRouter.process_stream(
+            req["input"], mode=mode, history=history
+        ):
             if event["type"] == "result":
                 r = event["result"]
                 # flatten CommandResult dataclass into the JSON shape the

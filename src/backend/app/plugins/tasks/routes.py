@@ -4,7 +4,7 @@ endpoints for tasks plugin
 
 from fastapi import APIRouter
 from app.plugins.tasks.controller.controller import TasksController
-from app.plugins.tasks.schemas import Task, TaskList, Label, TasksState, CreateLabel, CreateTaskList, CreateTask
+from app.plugins.tasks.schemas import Task, TaskList, Label, TasksState, CreateLabel, CreateTaskList, CreateTask, FocusStats
 
 class TasksRouter:
     def __init__(self, controller: TasksController):
@@ -37,6 +37,7 @@ class TasksRouter:
         self.router.add_api_route("/reset_work/{task_id}", self.reset_work, methods=["PUT"])
         self.router.add_api_route("/set_pomodoro_goal/{task_id}", self.set_pomodoro_goal, methods=["PUT"])
         self.router.add_api_route("/get_task_sessions/{task_id}", self.get_task_sessions, methods=["GET"])
+        self.router.add_api_route("/focus_stats", self.get_focus_stats, methods=["GET"])
         
     async def add_task(self, task: CreateTask):
         await self.controller.add_task(task)
@@ -140,3 +141,7 @@ class TasksRouter:
 
     async def get_task_sessions(self, task_id: str):
         return await self.controller.get_task_sessions(task_id)
+
+    async def get_focus_stats(self, days: int = 7):
+        stats = await self.controller.get_focus_stats(days)
+        return stats

@@ -62,3 +62,41 @@ class TasksState(BaseModel):
     today_tasks: list[Task] = Field(default_factory=list)
     tasks_due_today: list[Task] = Field(default_factory=list)
     active_tasks: list[Task] = Field(default_factory=list)
+
+class FocusStatsDay(BaseModel):
+    date: str
+    seconds: int
+    sessions: int
+
+
+class FocusStatsLabel(BaseModel):
+    id: int
+    name: str
+    colour: str
+    seconds: int
+    sessions: int
+
+
+class FocusStatsTask(BaseModel):
+    task_id: int
+    title: str
+    seconds: int
+    sessions: int
+
+
+class FocusStats(BaseModel):
+    days: int
+    total_seconds: int
+    recorded_seconds: int
+    active_seconds: int
+    this_week_seconds: int
+    session_count: int
+    focus_days: int
+    average_session_seconds: int
+    longest_streak: int
+    current_streak: int
+    best_day: Optional[str] = None
+    best_day_seconds: int = 0
+    daily: list[FocusStatsDay] = Field(default_factory=list)
+    labels: list[FocusStatsLabel] = Field(default_factory=list)
+    tasks: list[FocusStatsTask] = Field(default_factory=list)
