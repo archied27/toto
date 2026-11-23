@@ -1,11 +1,16 @@
 {
-    "short_name": "Toto",
     "name": "Toto",
+    "short_name": "Toto",
+    "description": "My application",
     "icons": [
-        { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-        { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+        { "src": "/icons/toto-apple-touch-icon-v3.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
+        { "src": "/icons/toto-apple-touch-icon-1024-v3.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" },
+        { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
     ],
-    "start_url": ".",
+    "start_url": "/",
+    "scope": "/",
     "display": "standalone",
     "theme_color": "#000000",
     "background_color": "#000000"

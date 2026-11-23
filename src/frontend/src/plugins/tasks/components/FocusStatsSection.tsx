@@ -1,4 +1,4 @@
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { CalendarDays, Flame, RefreshCw, Timer, Trophy } from "lucide-react";
 import { useEffect } from "react";
 import { useFocusStats } from "../useTasks";
@@ -16,6 +16,16 @@ function shortDate(value: string): string {
     return date.toLocaleDateString(undefined, { weekday: "short", day: "numeric" });
 }
 
+function focusBarColour(seconds: number, maxSeconds: number): string {
+    if (seconds <= 0) return "#475569";
+
+    const ratio = seconds / Math.max(maxSeconds, 1);
+    if (ratio >= 0.75) return "#f97316";
+    if (ratio >= 0.5) return "#f59e0b";
+    if (ratio >= 0.25) return "#22c55e";
+    return "#38bdf8";
+}
+
 export default function FocusStatsSection() {
     const { stats, days, setDays, loading, refetch } = useFocusStats(7);
 
@@ -24,10 +34,12 @@ export default function FocusStatsSection() {
         return () => window.clearInterval(interval);
     }, [refetch]);
 
+    const maxDailySeconds = Math.max(1, ...((stats?.daily ?? []).map((day) => day.seconds)));
     const chartData = (stats?.daily ?? []).map((day) => ({
         ...day,
         label: shortDate(day.date),
         hours: Number((day.seconds / 3600).toFixed(2)),
+        fill: focusBarColour(day.seconds, maxDailySeconds),
     }));
 
     const maxLabelSeconds = Math.max(1, ...((stats?.labels ?? []).map((label) => label.seconds)));
@@ -93,9 +105,13 @@ export default function FocusStatsSection() {
                             <Tooltip
                                 cursor={{ fill: "hsl(var(--muted)/0.35)" }}
                                 formatter={(value) => [formatDuration(Number(value) * 3600), "Focused"]}
-                                contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 12, fontSize: 12 }}
+                                contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 12, fontSize: 12, color: "hsl(var(--popover-foreground))" }}
                             />
-                            <Bar dataKey="hours" fill="hsl(var(--primary))" radius={[5, 5, 0, 0]} />
+                            <Bar dataKey="hours" radius={[5, 5, 0, 0]} minPointSize={3}>
+                                {chartData.map((day) => (
+                                    <Cell key={day.date} fill={day.fill} />
+                                ))}
+                            </Bar>
                         </BarChart>
                     </ResponsiveContainer>
                 </div>

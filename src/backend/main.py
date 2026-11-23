@@ -23,6 +23,7 @@ from app.core.agent_registry import (
     DeviceTimeoutError,
     DeviceDisconnectedError,
 )
+from app.core.push_notifications import PushNotificationService
 import json
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -45,6 +46,8 @@ async def lifespan(app: FastAPI):
     db_manager = DBManager(db_path)
     agent_registry = AgentRegistry()
     core = Core(event_bus, bg_worker, scheduler, db_manager, state, agent_registry)
+    push_notifications = PushNotificationService(db_manager, scheduler)
+    await push_notifications.setup()
 
     await ws_manager.forward("dashboard.changed")
     await ws_manager.forward("pages.changed")
@@ -69,6 +72,7 @@ async def lifespan(app: FastAPI):
     app.state.dashboard_service = dashboard
     app.state.pages_service = pages
     app.state.agent_registry = agent_registry
+    app.state.push_notifications = push_notifications
 
     # load initial state for dashboard and pages
     await pages.update_pages()
@@ -271,9 +275,65 @@ async def execute_agent_tool(device_id: str, action: str, req: dict):
 async def manifest():
     return FileResponse("../frontend/dist/manifest.json")
 
+@app.get("/manifest.webmanifest")
+async def generated_manifest():
+    return FileResponse("../frontend/dist/manifest.webmanifest")
+
+@app.get("/registerSW.js")
+async def register_service_worker():
+    return FileResponse("../frontend/dist/registerSW.js")
+
 @app.get("/sw.js")
 async def service_worker():
     return FileResponse("../frontend/dist/sw.js")
 
 app.mount("/icons", StaticFiles(directory="../frontend/dist/icons"), name="icons")
 app.mount("/assets", StaticFiles(directory="../frontend/dist/assets"), name="assets")
+
+@app.get("/notifications/vapid-public-key")
+async def get_vapid_public_key():
+    return {"public_key": app.state.push_notifications.public_key()}
+
+@app.post("/notifications/subscribe")
+async def subscribe_push(req: dict):
+    from fastapi import Request
+    return {"ok": await app.state.push_notifications.subscribe(req["subscription"])}
+
+@app.post("/notifications/unsubscribe")
+async def unsubscribe_push(req: dict):
+    return {"ok": await app.state.push_notifications.unsubscribe(req["endpoint"])}
+
+@app.post("/notifications/send")
+async def send_push(req: dict):
+    return await app.state.push_notifications.send(
+        req["title"],
+        req.get("body", ""),
+        req.get("url", "/"),
+        req.get("tag"),
+    )
+
+@app.post("/notifications/test")
+async def test_push():
+    return await app.state.push_notifications.send(
+        "Toto notifications",
+        "Push notifications are working.",
+        "/",
+        "toto-test",
+    )
+
+@app.post("/notifications/schedule")
+async def schedule_push(req: dict):
+    from datetime import datetime
+    run_at = datetime.fromisoformat(req["run_at"].replace("Z", "+00:00"))
+    job_id = app.state.push_notifications.schedule(
+        req["title"],
+        req.get("body", ""),
+        run_at,
+        req.get("url", "/"),
+        req.get("tag"),
+    )
+    return {"job_id": job_id}
+
+@app.post("/notifications/cancel")
+async def cancel_push(req: dict):
+    return {"ok": app.state.push_notifications.cancel(req["tag"])}

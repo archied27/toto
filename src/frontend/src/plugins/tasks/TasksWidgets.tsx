@@ -3,7 +3,8 @@ import TaskCard from "./components/TaskCard";
 import { useNavigation } from "@/hooks/NavigationContext";
 import { WidgetContainer } from "@/components/WidgetContainer";
 import { Button } from "@/components/ui/button";
-import { CircleAlertIcon, ClockIcon, PauseIcon, PlayIcon, SquareIcon, TimerIcon, SkipForwardIcon } from "lucide-react";
+import { CircleAlertIcon, ClockIcon, PauseIcon, PlayIcon, SquareIcon, TimerIcon, SkipForwardIcon, BellOffIcon } from "lucide-react";
+import { cancelPushNotification, enablePushNotifications, disablePushNotifications, hasPushSubscription, schedulePushNotification } from "@/lib/notifications";
 import { useEffect, useRef, useState } from "react";
 
 const maxTasksToShow = 2;
@@ -92,6 +93,9 @@ export function PomodoroTimer({ tasks, initialTaskId, onStop, fillHeight = false
     const [completedFocusSessions, setCompletedFocusSessions] = useState(0);
     const [now, setNow] = useState(() => Date.now());
     const [animateStop, setAnimateStop] = useState(false);
+    const [notificationsEnabled, setNotificationsEnabled] = useState(() => window.localStorage.getItem("toto:pomodoro:notifications") === "enabled");
+    const [notificationsChecked, setNotificationsChecked] = useState(false);
+    const [notificationError, setNotificationError] = useState<string | null>(null);
     const hydratedTaskId = useRef<number | null>(null);
     const transitionInProgress = useRef(false);
     const timerBusy = starting || stopping || pausing;
@@ -151,10 +155,27 @@ export function PomodoroTimer({ tasks, initialTaskId, onStop, fillHeight = false
             setBreakRemaining(nextBreak);
             setBreakEndsAt(Date.now() + nextBreak * 1000);
             setPhase("break");
+            // Schedule push notification for break start
+            if (notificationsEnabled) {
+                void schedulePushNotification({
+                    title: "Break Time!",
+                    body: `Take a break for ${nextBreak / 60} minutes.`,
+                    runAt: new Date(),
+                    url: "/",
+                    tag: "pomodoro-break",
+                });
+                void schedulePushNotification({
+                    title: "Focus Time!",
+                    body: "Your break has ended. Ready to focus?",
+                    runAt: new Date(Date.now() + nextBreak * 1000),
+                    url: "/",
+                    tag: "pomodoro-focus",
+                });
+            }
         }).finally(() => {
             transitionInProgress.current = false;
         });
-    }, [completedFocusSessions, elapsedSeconds, goalSeconds, pauseWork, phase, selectedTask]);
+    }, [completedFocusSessions, elapsedSeconds, goalSeconds, pauseWork, phase, selectedTask, notificationsEnabled]);
 
     useEffect(() => {
         if (phase !== "break" || !breakEndsAt || now < breakEndsAt || !selectedTask || transitionInProgress.current) return;
@@ -215,6 +236,23 @@ export function PomodoroTimer({ tasks, initialTaskId, onStop, fillHeight = false
             setBreakRemaining(nextBreak);
             setBreakEndsAt(Date.now() + nextBreak * 1000);
             setPhase("break");
+            // Schedule push notification for break skip
+            if (notificationsEnabled) {
+                void schedulePushNotification({
+                    title: "Break Time!",
+                    body: `You've earned a break! Enjoy ${nextBreak / 60} minutes.`,
+                    runAt: new Date(),
+                    url: "/",
+                    tag: "pomodoro-break",
+                });
+                void schedulePushNotification({
+                    title: "Focus Time!",
+                    body: "Your break has ended. Ready to focus?",
+                    runAt: new Date(Date.now() + nextBreak * 1000),
+                    url: "/",
+                    tag: "pomodoro-focus",
+                });
+            }
         }
     };
 
@@ -233,6 +271,33 @@ export function PomodoroTimer({ tasks, initialTaskId, onStop, fillHeight = false
             setCompletedFocusSessions(0);
             setAnimateStop(false);
         }, 500);
+    };
+
+    useEffect(() => {
+        void hasPushSubscription().then((hasSubscription) => {
+            setNotificationsEnabled(hasSubscription);
+            window.localStorage.setItem("toto:pomodoro:notifications", hasSubscription ? "enabled" : "disabled");
+        }).catch(() => setNotificationsEnabled(false)).finally(() => setNotificationsChecked(true));
+    }, []);
+
+    const togglePomodoroNotifications = async () => {
+        setNotificationError(null);
+        try {
+            if (notificationsEnabled) {
+                await disablePushNotifications();
+                window.localStorage.setItem("toto:pomodoro:notifications", "disabled");
+                setNotificationsEnabled(false);
+                await cancelPushNotification("pomodoro-phase");
+                return;
+            }
+
+            await enablePushNotifications();
+            window.localStorage.setItem("toto:pomodoro:notifications", "enabled");
+            setNotificationsEnabled(true);
+        } catch (error) {
+            setNotificationsEnabled(false);
+            setNotificationError(error instanceof Error ? error.message : "Unable to enable notifications");
+        }
     };
 
     return (
@@ -293,6 +358,17 @@ export function PomodoroTimer({ tasks, initialTaskId, onStop, fillHeight = false
                     </div>
                 </div>
             </div>
+
+            {notificationsChecked && !notificationsEnabled && (
+                <div className="flex items-center justify-center">
+                    <Button size="icon" variant="outline" className="size-8 rounded-lg transition-transform duration-200 active:scale-90" onClick={togglePomodoroNotifications} aria-label="Enable notifications" title="Enable notifications">
+                        <BellOffIcon className="size-4" />
+                    </Button>
+                </div>
+            )}
+            {notificationError && (
+                <p className="text-center text-xs text-destructive">{notificationError}</p>
+            )}
         </div>
     );
 }

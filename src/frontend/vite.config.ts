@@ -17,7 +17,10 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/favicon.ico', 'icons/*.png'],
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      includeAssets: ['icons/favicon.ico', 'icons/*.png', 'icons/*-1024.png', 'icons/*-512.png'],
       manifest: {
         name: 'Toto',
         short_name: 'Toto',
@@ -28,20 +31,34 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: 'icons/icon-192.png',
-            sizes: '192x192',
-            type: 'image/png'
+            src: 'icons/toto-apple-touch-icon-v3.png',
+            sizes: '180x180',
+            type: 'image/png',
+            purpose: 'any'
           },
           {
-            src: 'icons/icon-512.png',
-            sizes: '512x512',
-            type: 'image/png'
+            src: 'icons/toto-apple-touch-icon-1024-v3.png',
+            sizes: '1024x1024',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: 'icons/icon-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any'
           },
           {
             src: 'icons/icon-512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'any'
+          },
+          {
+            src: 'icons/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
           }
         ]
       },
@@ -51,6 +68,9 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         navigateFallback: 'index.html',
         navigateFallbackDenylist: [/^\/weather/, /^\/ws/],
+      },
+      injectManifest: {
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
       },
 
       devOptions: {
