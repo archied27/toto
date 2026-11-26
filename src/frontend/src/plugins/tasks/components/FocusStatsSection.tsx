@@ -100,12 +100,14 @@ export default function FocusStatsSection() {
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={chartData} margin={{ top: 4, right: 0, left: -26, bottom: 0 }}>
                             <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeDasharray="3 3" />
-                            <XAxis dataKey="label" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} tickFormatter={(value: number) => `${value}h`} />
+                            <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#ffffff" }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fontSize: 10, fill: "#ffffff" }} axisLine={false} tickLine={false} tickFormatter={(value: number) => `${value}h`} />
                             <Tooltip
                                 cursor={{ fill: "hsl(var(--muted)/0.35)" }}
                                 formatter={(value) => [formatDuration(Number(value) * 3600), "Focused"]}
-                                contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 12, fontSize: 12, color: "hsl(var(--popover-foreground))" }}
+                                contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 12, fontSize: 12, color: "#ffffff" }}
+                                itemStyle={{ color: "#ffffff" }}
+                                labelStyle={{ color: "#ffffff" }}
                             />
                             <Bar dataKey="hours" radius={[5, 5, 0, 0]} minPointSize={3}>
                                 {chartData.map((day) => (

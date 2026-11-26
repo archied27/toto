@@ -43,7 +43,13 @@ class TasksDBController:
                 time_spent INTEGER DEFAULT 0,
                 work_session_start TEXT,
                 session_started_at TEXT,
-                pomodoro_goal INTEGER DEFAULT 1500
+                pomodoro_goal INTEGER DEFAULT 1500,
+                pomodoro_active BOOLEAN DEFAULT 0,
+                pomodoro_phase TEXT DEFAULT 'focus',
+                pomodoro_focus_elapsed INTEGER DEFAULT 0,
+                pomodoro_break_ends_at TEXT,
+                pomodoro_break_remaining INTEGER DEFAULT 300,
+                pomodoro_completed_sessions INTEGER DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS tasks_tasks_labels (
@@ -75,6 +81,12 @@ class TasksDBController:
             "work_session_start": "TEXT",
             "session_started_at": "TEXT",
             "pomodoro_goal": "INTEGER DEFAULT 1500",
+            "pomodoro_active": "BOOLEAN DEFAULT 0",
+            "pomodoro_phase": "TEXT DEFAULT 'focus'",
+            "pomodoro_focus_elapsed": "INTEGER DEFAULT 0",
+            "pomodoro_break_ends_at": "TEXT",
+            "pomodoro_break_remaining": "INTEGER DEFAULT 300",
+            "pomodoro_completed_sessions": "INTEGER DEFAULT 0",
         }
         for name, definition in columns.items():
             if name not in existing_columns:
@@ -192,7 +204,13 @@ class TasksDBController:
             session_elapsed=row["session_elapsed"],
             time_spent=row["time_spent"],
             work_session_start=row["work_session_start"],
-            pomodoro_goal=row["pomodoro_goal"]
+            pomodoro_goal=row["pomodoro_goal"],
+            pomodoro_active=bool(row["pomodoro_active"]),
+            pomodoro_phase=row["pomodoro_phase"],
+            pomodoro_focus_elapsed=row["pomodoro_focus_elapsed"],
+            pomodoro_break_ends_at=row["pomodoro_break_ends_at"],
+            pomodoro_break_remaining=row["pomodoro_break_remaining"],
+            pomodoro_completed_sessions=row["pomodoro_completed_sessions"],
         )
 
     async def add_task(self, task: CreateTask):

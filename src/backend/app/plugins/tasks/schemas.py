@@ -44,6 +44,12 @@ class Task(BaseModel):
     time_spent: int = 0
     work_session_start: Optional[str] = None
     pomodoro_goal: int = 1500  # default 25 minutes in seconds
+    pomodoro_active: bool = False
+    pomodoro_phase: str = "focus"
+    pomodoro_focus_elapsed: int = 0
+    pomodoro_break_ends_at: Optional[str] = None
+    pomodoro_break_remaining: int = 300
+    pomodoro_completed_sessions: int = 0
 
 TaskList.model_rebuild()
 

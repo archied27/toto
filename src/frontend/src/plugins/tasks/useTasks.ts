@@ -30,6 +30,12 @@ export interface Task {
     time_spent?: number;
     work_session_start?: string;
     pomodoro_goal?: number;
+    pomodoro_active?: boolean;
+    pomodoro_phase?: "focus" | "break";
+    pomodoro_focus_elapsed?: number;
+    pomodoro_break_ends_at?: string;
+    pomodoro_break_remaining?: number;
+    pomodoro_completed_sessions?: number;
 }
 
 export interface WorkSession {
@@ -446,6 +452,34 @@ export function usePauseWork() {
     }, []);
 
     return { pauseWork, loading };
+}
+
+export function usePomodoroBreakControls() {
+    const [loading, setLoading] = useState(false);
+
+    const skipToBreak = useCallback(async (taskId: number) => {
+        setLoading(true);
+        try {
+            await apiFetch(`/tasks/pomodoro/skip_to_break/${taskId}`, { method: "PUT" });
+        } catch (error) {
+            console.error("Failed to start a Pomodoro break", error);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const skipBreak = useCallback(async (taskId: number) => {
+        setLoading(true);
+        try {
+            await apiFetch(`/tasks/pomodoro/skip_break/${taskId}`, { method: "PUT" });
+        } catch (error) {
+            console.error("Failed to skip the Pomodoro break", error);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    return { skipToBreak, skipBreak, loading };
 }
 
 export function useSetPomodoroGoal() {

@@ -45,9 +45,9 @@ async def lifespan(app: FastAPI):
     db_path = os.getenv("TOTO_DB_PATH", "../data/toto.db")
     db_manager = DBManager(db_path)
     agent_registry = AgentRegistry()
-    core = Core(event_bus, bg_worker, scheduler, db_manager, state, agent_registry)
     push_notifications = PushNotificationService(db_manager, scheduler)
     await push_notifications.setup()
+    core = Core(event_bus, bg_worker, scheduler, db_manager, state, agent_registry, push_notifications)
 
     await ws_manager.forward("dashboard.changed")
     await ws_manager.forward("pages.changed")

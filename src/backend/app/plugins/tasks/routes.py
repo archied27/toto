@@ -34,6 +34,8 @@ class TasksRouter:
         self.router.add_api_route("/start_work/{task_id}", self.start_work, methods=["PUT"])
         self.router.add_api_route("/stop_work/{task_id}", self.stop_work, methods=["PUT"])
         self.router.add_api_route("/pause_work/{task_id}", self.pause_work, methods=["PUT"])
+        self.router.add_api_route("/pomodoro/skip_to_break/{task_id}", self.skip_to_break, methods=["PUT"])
+        self.router.add_api_route("/pomodoro/skip_break/{task_id}", self.skip_break, methods=["PUT"])
         self.router.add_api_route("/reset_work/{task_id}", self.reset_work, methods=["PUT"])
         self.router.add_api_route("/set_pomodoro_goal/{task_id}", self.set_pomodoro_goal, methods=["PUT"])
         self.router.add_api_route("/get_task_sessions/{task_id}", self.get_task_sessions, methods=["GET"])
@@ -74,6 +76,14 @@ class TasksRouter:
     async def pause_work(self, task_id: str):
         await self.controller.pause_work(task_id)
         return {"message": "Paused work on task successfully"}
+
+    async def skip_to_break(self, task_id: str):
+        await self.controller.skip_to_break(task_id)
+        return {"message": "Started a break successfully"}
+
+    async def skip_break(self, task_id: str):
+        await self.controller.skip_break(task_id)
+        return {"message": "Resumed focus successfully"}
 
     async def add_label(self, label: CreateLabel):
         await self.controller.add_label(label)
