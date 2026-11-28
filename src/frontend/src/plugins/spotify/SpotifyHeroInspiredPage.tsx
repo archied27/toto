@@ -133,7 +133,11 @@ export function SpotifyHeroInspiredPage() {
                         {current?.album_image && <><img src={current.album_image} alt="" aria-hidden="true" className="absolute -inset-[18%] h-[136%] w-[136%] scale-110 object-cover opacity-45 blur-[110px]" /><img src={current.album_image} alt="" aria-hidden="true" className="absolute -inset-[8%] h-[116%] w-[116%] scale-110 object-cover opacity-20 blur-[36px]" /><div className="absolute inset-0 bg-gradient-to-b from-black/10 via-[#151516]/30 to-[#09090a]" /></>}
                         <div className="relative z-10 mx-auto max-w-xl px-5 pt-6 sm:px-8">
                             <header className="flex items-center justify-between"><h1 className="text-[20px] font-semibold tracking-tight">Spotify</h1><button type="button" disabled={syncing} className="flex size-9 items-center justify-center rounded-full text-white/60 transition hover:bg-white/10 hover:text-white" onClick={() => void syncAlbums()} aria-label="Sync albums"><RefreshCw className={`size-4 ${syncing ? "animate-spin" : ""}`} /></button></header>
-                            {state.current && <div className="relative mt-6 rounded-lg bg-black/10 p-1 backdrop-blur-[2px]"><SpotifyHeroWidget /></div>}
+                            {state.current && (
+                                <div className="relative mt-6 h-[min(100vw,440px)] min-h-[320px] w-full overflow-hidden rounded-2xl bg-black/10 backdrop-blur-[2px]">
+                                    <SpotifyHeroWidget />
+                                </div>
+                            )}
                             {false && current && <div className="pt-7">
                                 <button type="button" className="mx-auto block w-[88%] max-w-[390px]" onClick={() => setDevicesOpen(true)}>{current.album_image ? <img src={current.album_image || undefined} alt={`${current.album} cover`} className="aspect-square w-full rounded-[26px] object-cover shadow-[0_34px_90px_rgba(0,0,0,.62)]" /> : <div className="aspect-square w-full rounded-[26px] bg-white/8" />}</button>
                                 <div className="mt-7 text-center"><h2 className="truncate text-[24px] font-semibold tracking-tight">{current.track}</h2><p className="mt-1 truncate text-sm text-white/55">{current.artists}</p><p className="mt-1 truncate text-xs text-white/35">{current.album}</p></div>
@@ -153,9 +157,40 @@ export function SpotifyHeroInspiredPage() {
 
                     {state.current && queue.length > 0 && <section className="mx-auto w-full min-w-0 max-w-xl px-5 pt-2 sm:px-8">
                         <div className="mb-3 flex items-center gap-2"><ListMusic className="size-4 text-white/60" /><div><p className="text-[10px] uppercase tracking-[0.2em] text-white/35">Coming up</p><h2 className="mt-1 text-lg font-semibold">Next up</h2></div></div>
-                        <div className="relative overflow-hidden rounded-[18px] bg-white/5 p-2">
-                            {queue[0]?.cover_image && <img src={queue[0].cover_image} alt="" aria-hidden="true" className="absolute -inset-8 h-[calc(100%+4rem)] w-[calc(100%+4rem)] object-cover opacity-25 blur-[42px]" />}
-                            <div className="relative space-y-1">{queue.slice(0, 5).map((track) => <button key={track.id} type="button" disabled={busy} onClick={() => void playTrack(track.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-white/10"><img src={track.cover_image || ""} alt="" className="size-11 shrink-0 rounded-lg bg-white/10 object-cover" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{track.name}</span><span className="block truncate text-xs text-white/50">{track.artist} · {track.album}</span></span><Play className="size-4 shrink-0 text-white/50" /></button>)}</div>
+                        <div className="relative isolate overflow-hidden rounded-[18px] border border-white/10 bg-[#171717] p-2">
+                            {queue[0]?.cover_image && (
+                                <img
+                                    src={queue[0].cover_image}
+                                    alt=""
+                                    aria-hidden="true"
+                                    className="absolute -inset-8 h-[calc(100%+4rem)] w-[calc(100%+4rem)] object-cover opacity-[0.12] blur-[42px]"
+                                />
+                            )}
+
+                            <div className="relative space-y-1">
+                                {queue.slice(0, 5).map((track) => (
+                                    <button
+                                        key={track.id}
+                                        type="button"
+                                        disabled={busy}
+                                        onClick={() => void playTrack(track.id)}
+                                        className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-white/10"
+                                    >
+                                        <img
+                                            src={track.cover_image || ""}
+                                            alt=""
+                                            className="size-11 shrink-0 rounded-lg bg-white/10 object-cover"
+                                        />
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block truncate text-sm font-medium">{track.name}</span>
+                                            <span className="block truncate text-xs text-white/50">
+                                                {track.artist} · {track.album}
+                                            </span>
+                                        </span>
+                                        <Play className="size-4 shrink-0 text-white/50" />
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </section>}
 

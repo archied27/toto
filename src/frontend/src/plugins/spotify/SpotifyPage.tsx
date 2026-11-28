@@ -294,7 +294,7 @@ function SpotifySurface({ fullPage = false, hero = false, wide = false }: { full
                         ? "w-full flex-col items-center justify-start gap-[3cqh] overflow-hidden p-[4cqh] text-center"
                         : "flex-col items-center justify-between gap-4 p-3 text-center sm:flex-row sm:items-stretch sm:text-left"
                 }`}
-                style={hero ? { containerType: "size" } : undefined}
+                style={hero ? { containerType: "size", width: "100%", height: "100%" } : undefined}
             >
                 {state.current.album_image && (
                     <img
@@ -302,7 +302,7 @@ function SpotifySurface({ fullPage = false, hero = false, wide = false }: { full
                         alt={`${state.current.album} album art`}
                         className={`shrink-0 rounded-md object-cover object-center shadow-lg ${
                             hero
-                                ? "w-auto h-auto max-w-full max-h-[65cqh] aspect-square"
+                                ? "aspect-square w-full max-w-[min(65cqh,65cqw)] max-h-[65cqh]"
                                 : "aspect-square size-40 sm:size-36"
                         }`}
                         style={hero ? {
@@ -325,14 +325,14 @@ function SpotifySurface({ fullPage = false, hero = false, wide = false }: { full
                         </p>
                         <p
                             className={`truncate text-white/75 drop-shadow-md ${
-                                hero ? "text-[3.8cqh]" : "text-xs"
+                                hero ? "text-[4cqh]" : "text-xs"
                             }`}
                         >
                             {state.current.artists}
                         </p>
                         <p
                             className={`mt-1 truncate text-white/65 drop-shadow-md ${
-                                hero ? "text-[3cqh]" : "text-[11px]"
+                                hero ? "text-[4cqh]" : "text-[11px]"
                             }`}
                         >
                             {state.current.album}
